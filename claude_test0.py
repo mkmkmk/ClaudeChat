@@ -46,14 +46,8 @@ css = """
 .user-message { background-color: #DCF8C6; margin-left: 40%; }
 .bot-message { background-color: #E0E0E0; margin-right: 40%; }
 .chat-container { height: 400px; overflow-y: auto; }
-button.orange-button, .orange-button button { 
-    background-color: orange !important; 
-    color: green !important; 
-}
-
-
+.orange-button { background: #F06210 !important; color: white !important; }
 """
-
 
 
 def export_history():
@@ -73,9 +67,8 @@ def export_history():
 with gr.Blocks(css=css) as iface:
     chatbot = gr.Chatbot(elem_classes="chat-container")
     with gr.Row():
-        msg = gr.Textbox(placeholder="Wpisz swoją wiadomosadść tutaj...", show_label=False)
-        # send = gr.Button("Wyślij!", elem_classes="orange-button")
-        send = gr.Button("Wyślij!!", elem_classes=["orange-button", "custom-button"])
+        msg = gr.Textbox(placeholder="Wpisz swoją wiadomość tutaj...", show_label=False)
+        send = gr.Button("Wyślij!!", elem_classes="orange-button")
     
     with gr.Row():
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperatura")
