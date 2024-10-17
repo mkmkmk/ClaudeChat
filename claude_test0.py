@@ -1,4 +1,3 @@
-
 import gradio as gr
 import anthropic
 import os
@@ -9,8 +8,8 @@ import asyncio
 client = anthropic.Client("YOUR_API_KEY")
 
 # load_dotenv()
-# TAJNY_KLUCZ = os.getenv("TAJNY_KLUCZ")
-# print(TAJNY_KLUCZ)
+# SECRET_KEY = os.getenv("SECRET_KEY")
+# print(SECRET_KEY)
 
 #-----------------
 
@@ -111,18 +110,12 @@ def export_history():
             f.write(f"User: {user_msg}\n")
             f.write(f"Assistant: {asst_msg}\n\n")
     
-    return f"Historia została wyeksportowana do pliku {filename}"
+    return f"History has been exported to file {filename}"
 
 async def respond(message, temp, tokens, history):
     async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens):
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
         yield "", history
-
-# def clear_history():
-#     global user_messages, assistant_messages
-#     user_messages = []
-#     assistant_messages = []
-#     return [], []
 
 def clear_history():
     global user_messages, assistant_messages
@@ -139,21 +132,21 @@ def toggle_buttons(state):
 with gr.Blocks(css=css) as iface:
     chatbot = gr.Chatbot(elem_classes="chat-container")
     with gr.Row():
-        msg = gr.Textbox(placeholder="Wpisz swoją wiadomość tutaj...", show_label=False)
-        send = gr.Button("Wyślij!!", elem_classes=["orange-button", "custom-button"], elem_id="send-button")
+        msg = gr.Textbox(placeholder="Type your message here...", show_label=False)
+        send = gr.Button("Send", elem_classes=["orange-button", "custom-button"], elem_id="send-button")
     
     with gr.Row():
-        temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperatura")
-        max_tokens = gr.Slider(minimum=100, maximum=2000, value=1000, step=100, label="Maksymalna liczba tokenów")
+        temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
+        max_tokens = gr.Slider(minimum=100, maximum=2000, value=1000, step=100, label="Maximum number of tokens")
     
     with gr.Row():
-        clear = gr.Button("Wyczyść..")
-        export = gr.Button("Eksportuj historię")
+        clear = gr.Button("Clear")
+        export = gr.Button("Export history")
 
     with gr.Row():
-        debug_toggle = gr.Checkbox(label="Aktywuj przyciski (debug)", value=False)
+        debug_toggle = gr.Checkbox(label="Activate buttons (debug)", value=False)
 
-    export_status = gr.Textbox(label="Status eksportu", interactive=False)
+    export_status = gr.Textbox(label="Export status", interactive=False)
 
     msg.submit(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot]).then(
         update_button_state, [chatbot], [clear, export]
@@ -162,9 +155,6 @@ with gr.Blocks(css=css) as iface:
         update_button_state, [chatbot], [clear, export]
     )
 
-    # clear.click(clear_history, None, [chatbot, msg]).then(
-    #     update_button_state, [chatbot], [clear, export]
-    # )
     clear.click(clear_history, None, [chatbot, msg, clear, export], queue=False)
 
     export.click(export_history, None, export_status)
