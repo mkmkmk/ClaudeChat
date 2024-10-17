@@ -3,52 +3,75 @@ import gradio as gr
 import anthropic
 import os
 import datetime
+import asyncio
+# from dotenv import load_dotenv
 
-os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
-client = anthropic.Client("YOUR_API_KEY") 
+client = anthropic.Client("YOUR_API_KEY")
+
+# load_dotenv()
+# TAJNY_KLUCZ = os.getenv("TAJNY_KLUCZ")
+# print(TAJNY_KLUCZ)
+
 #-----------------
 
-# Listy do przechowywania historii
+# os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
+
 user_messages = []
 assistant_messages = []
 
-def chat_with_claude(message, temperature, max_tokens):
+
+async def chat_with_claude(message, temperature, max_tokens):
     global user_messages, assistant_messages
     
     if not message.strip():
-        return user_messages, assistant_messages
+        yield user_messages, assistant_messages
+        return
 
     user_messages.append(message)
 
-    # Przygotowanie wiadomości dla API
     messages = []
     for user_msg, asst_msg in zip(user_messages, assistant_messages):
-        messages.append({"role": "user", "content": [{"type": "text", "text": user_msg}]})
-        messages.append({"role": "assistant", "content": [{"type": "text", "text": asst_msg}]})
-    messages.append({"role": "user", "content": [{"type": "text", "text": message}]})
+        messages.append({"role": "user", "content": user_msg})
+        messages.append({"role": "assistant", "content": asst_msg})
+    messages.append({"role": "user", "content": message})
 
-    # Wywołanie API Anthropic
-    response = client.messages.create(
+    stream = client.messages.create(
         model="claude-3-5-sonnet-20240620",
         max_tokens=max_tokens,
         temperature=temperature,
-        messages=messages
+        messages=messages,
+        stream=True
     )
-    
-    assistant_message = response.content[0].text
-    assistant_messages.append(assistant_message)
-    
-    return user_messages, assistant_messages
 
-# CSS dla stylizacji czatu i przycisku
+    assistant_message = ""
+    for chunk in stream:
+        if chunk.delta.text:
+            assistant_message += chunk.delta.text
+            await asyncio.sleep(0)  # Allow other tasks to run
+            yield user_messages, assistant_messages + [assistant_message]
+
+    assistant_messages.append(assistant_message)
+    yield user_messages, assistant_messages
+
 css = """
 .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
 .user-message { background-color: #DCF8C6; margin-left: 40%; }
 .bot-message { background-color: #E0E0E0; margin-right: 40%; }
 .chat-container { height: 400px; overflow-y: auto; }
-.orange-button { background: #F06210 !important; color: white !important; }
+#send-button,
+button#send-button,
+.orange-button#send-button,
+div[id^='component-'] #send-button {
+    background-color: orange !important; 
+    background: orange !important;
+    color: green !important; 
+}
+button:not(#send-button) {
+    background-color: initial !important;
+    background: initial !important;
+    color: initial !important;
+}
 """
-
 
 def export_history():
     global user_messages, assistant_messages
@@ -62,13 +85,17 @@ def export_history():
     
     return f"Historia została wyeksportowana do pliku {filename}"
 
+async def respond(message, temp, tokens):
+    chat_history = []
+    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens):
+        chat_history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
+        yield "", chat_history
 
-# Tworzenie interfejsu Gradio
 with gr.Blocks(css=css) as iface:
     chatbot = gr.Chatbot(elem_classes="chat-container")
     with gr.Row():
         msg = gr.Textbox(placeholder="Wpisz swoją wiadomość tutaj...", show_label=False)
-        send = gr.Button("Wyślij!!", elem_classes="orange-button")
+        send = gr.Button("Wyślij!!", elem_classes=["orange-button", "custom-button"], elem_id="send-button")
     
     with gr.Row():
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperatura")
@@ -79,11 +106,6 @@ with gr.Blocks(css=css) as iface:
         export = gr.Button("Eksportuj historię")
 
     export_status = gr.Textbox(label="Status eksportu", interactive=False)
-
-    def respond(message, temp, tokens):
-        user_msgs, asst_msgs = chat_with_claude(message, temp, tokens)
-        chat_history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
-        return "", chat_history
 
     msg.submit(respond, [msg, temperature, max_tokens], [msg, chatbot])
     send.click(respond, [msg, temperature, max_tokens], [msg, chatbot])
@@ -97,5 +119,7 @@ with gr.Blocks(css=css) as iface:
 
     export.click(export_history, None, export_status)
 
-# Uruchomienie interfejsu
-iface.launch()
+if __name__ == "__main__":
+    iface.queue()
+    # iface.launch(server_port=7861)
+    iface.launch()
