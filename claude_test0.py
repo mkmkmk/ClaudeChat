@@ -4,10 +4,14 @@ import anthropic
 import datetime
 import asyncio
 import argparse
+import uuid
+
+DEBUG = False
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Chat application with Anthropic API")
     parser.add_argument("--port", type=int, default=7860, help="Port number to run the server on")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logs")
     return parser.parse_args()
 
 def load_env(file_path='.env'):
@@ -26,13 +30,20 @@ api_key = env.get('MY_ANTHROPIC_API_KEY')
 client = anthropic.Client(api_key = api_key)
 
 def create_session():
-    return {
+    session_id = str(uuid.uuid4())
+    session = {
+        "id": session_id,
         "user_messages": [],
         "assistant_messages": [],
         "stop_generation": False
     }
+    if DEBUG:
+        print(f"New session created: {session_id}")
+    return session
 
 async def chat_with_claude(message, temperature, max_tokens, session):
+    if DEBUG:
+        print(f"{session['id']}: {message}")
     if not message.strip():
         yield session["user_messages"], session["assistant_messages"]
         return
@@ -79,6 +90,8 @@ async def chat_with_claude(message, temperature, max_tokens, session):
     session["stop_generation"] = False
 
 def stop_generation_func(session):
+    if DEBUG:
+        print(f"Stop generation called for session: {session['id']}")
     session["stop_generation"] = True
 
 css = """
@@ -122,6 +135,8 @@ button.primary:not(#send-button):disabled {
 """
 
 def export_history(session):
+    if DEBUG:
+        print(f"Exporting history for session: {session['id']}")
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"chat_history_{timestamp}.txt"
     
@@ -138,6 +153,8 @@ async def respond(message, temp, tokens, history, session):
         yield "", history
 
 def clear_history(session):
+    if DEBUG:
+        print(f"Clearing history for session: {session['id']}")
     session["user_messages"] = []
     session["assistant_messages"] = []
     return [], ""
@@ -178,6 +195,9 @@ with gr.Blocks(css=css) as iface:
 
 if __name__ == "__main__":
     args = parse_arguments()
+    DEBUG = args.debug
+    if DEBUG:
+        print("Debug mode enabled")
     iface.queue()
     iface.launch(server_port=args.port, server_name="0.0.0.0")
 
