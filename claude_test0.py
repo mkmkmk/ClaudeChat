@@ -45,13 +45,25 @@ async def chat_with_claude(message, temperature, max_tokens):
 
     assistant_message = ""
     for chunk in stream:
-        if chunk.delta.text:
-            assistant_message += chunk.delta.text
-            await asyncio.sleep(0)  # Allow other tasks to run
-            yield user_messages, assistant_messages + [assistant_message]
+        if hasattr(chunk, 'delta'):
+            if hasattr(chunk.delta, 'text'):
+                assistant_message += chunk.delta.text
+            elif hasattr(chunk.delta, 'content') and chunk.delta.content:
+                for content in chunk.delta.content:
+                    if content.type == 'text':
+                        assistant_message += content.text
+        elif hasattr(chunk, 'message'):
+            if hasattr(chunk.message, 'content'):
+                for content in chunk.message.content:
+                    if content.type == 'text':
+                        assistant_message += content.text
+
+        await asyncio.sleep(0)  # Allow other tasks to run
+        yield user_messages, assistant_messages + [assistant_message]
 
     assistant_messages.append(assistant_message)
     yield user_messages, assistant_messages
+
 
 css = """
 .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
