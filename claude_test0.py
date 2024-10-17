@@ -95,43 +95,63 @@ def stop_generation_func(session):
     session["stop_generation"] = True
 
 css = """
-.chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
-.user-message { background-color: #DCF8C6 !important; margin-left: 40%; }
-.bot-message { background-color: #E0E0E0 !important; margin-right: 40%; }
-.chat-container { height: 400px; overflow-y: auto; }
-#send-button,
-button#send-button,
-.orange-button#send-button,
-div[id^='component-'] #send-button {
-    background-color: orange !important; 
-    background: orange !important;
-    color: white !important;
-}
-button.primary:not(#send-button) {
-    background-color: #2196F3 !important;
-    color: white !important;
-    border: none !important;
-    padding: 10px 20px !important;
-    text-align: center !important;
-    text-decoration: none !important;
-    display: inline-block !important;
-    font-size: 16px !important;
-    margin: 4px 2px !important;
-    cursor: pointer !important;
-    transition: 0.3s !important;
-}
-button.primary:not(#send-button):hover {
-    background-color: #0b7dda !important;
-}
-button.primary:not(#send-button):disabled {
-    background-color: #cccccc !important;
-    color: #666666 !important;
-    cursor: not-allowed !important;
-}
-.footer {
-    background-color: initial !important;
-    color: initial !important;
-}
+    .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
+    .user-message { background-color: #DCF8C6 !important; margin-left: 40%; }
+    .bot-message { background-color: #E0E0E0 !important; margin-right: 40%; }
+    .chat-container { height: 400px; overflow-y: auto; }
+    #send-button,
+    button#send-button,
+    .orange-button#send-button,
+    div[id^='component-'] #send-button {
+        background-color: orange !important; 
+        background: orange !important;
+        color: white !important;
+    }
+    button.primary:not(#send-button) {
+        background-color: #2196F3 !important;
+        color: white !important;
+        border: none !important;
+        padding: 10px 20px !important;
+        text-align: center !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        font-size: 16px !important;
+        margin: 4px 2px !important;
+        cursor: pointer !important;
+        transition: 0.3s !important;
+    }
+    button.primary:not(#send-button):hover {
+        background-color: #0b7dda !important;
+    }
+    button.primary:not(#send-button):disabled {
+        background-color: #cccccc !important;
+        color: #666666 !important;
+        cursor: not-allowed !important;
+    }
+    .footer {
+        background-color: initial !important;
+        color: initial !important;
+    }
+    body, .gradio-container {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        width: 100vw;
+    }
+    .gradio-container {
+        display: flex;
+        flex-direction: column;
+    }
+    .chat-container {
+        flex-grow: 1;
+        min-height: 70vh;
+        overflow-y: auto;
+    }
+    #component-0 {
+        height: 90%;
+        display: flex;
+        flex-direction: column;
+    }
 """
 
 def export_history(session):
