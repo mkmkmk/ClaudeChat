@@ -15,9 +15,10 @@ client = anthropic.Client("YOUR_API_KEY")
 
 user_messages = []
 assistant_messages = []
+stop_generation = False
 
 async def chat_with_claude(message, temperature, max_tokens):
-    global user_messages, assistant_messages
+    global user_messages, assistant_messages, stop_generation
     
     if not message.strip():
         yield user_messages, assistant_messages
@@ -41,6 +42,8 @@ async def chat_with_claude(message, temperature, max_tokens):
 
     assistant_message = ""
     for chunk in stream:
+        if stop_generation:
+            break
         if hasattr(chunk, 'delta'):
             if hasattr(chunk.delta, 'text'):
                 assistant_message += chunk.delta.text
@@ -57,8 +60,15 @@ async def chat_with_claude(message, temperature, max_tokens):
         await asyncio.sleep(0)
         yield user_messages, assistant_messages + [assistant_message]
 
+    # if not stop_generation:
     assistant_messages.append(assistant_message)
     yield user_messages, assistant_messages
+
+    stop_generation = False
+
+def stop_generation_func():
+    global stop_generation
+    stop_generation = True
 
 css = """
 .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
@@ -71,7 +81,7 @@ button#send-button,
 div[id^='component-'] #send-button {
     background-color: orange !important; 
     background: orange !important;
-    color: green !important; 
+    color: white !important;
 }
 button.primary:not(#send-button) {
     background-color: #2196F3 !important;
@@ -121,13 +131,10 @@ def clear_history():
     global user_messages, assistant_messages
     user_messages = []
     assistant_messages = []
-    return [], "", gr.update(interactive=False), gr.update(interactive=False)
+    return [], ""
 
 def update_button_state(history):
-    return [gr.update(interactive=bool(history))] * 2
-
-def toggle_buttons(state):
-    return gr.update(interactive=state), gr.update(interactive=state)
+    return gr.update(interactive=bool(history)), gr.update(interactive=bool(history))
 
 with gr.Blocks(css=css) as iface:
     chatbot = gr.Chatbot(elem_classes="chat-container")
@@ -142,9 +149,7 @@ with gr.Blocks(css=css) as iface:
     with gr.Row():
         clear = gr.Button("Clear")
         export = gr.Button("Export history")
-
-    with gr.Row():
-        debug_toggle = gr.Checkbox(label="Activate buttons (debug)", value=False)
+        stop = gr.Button("Stop Generation")
 
     export_status = gr.Textbox(label="Export status", interactive=False)
 
@@ -155,11 +160,11 @@ with gr.Blocks(css=css) as iface:
         update_button_state, [chatbot], [clear, export]
     )
 
-    clear.click(clear_history, None, [chatbot, msg, clear, export], queue=False)
+    clear.click(clear_history, None, [chatbot, msg], queue=False)
 
     export.click(export_history, None, export_status)
     
-    debug_toggle.change(toggle_buttons, inputs=[debug_toggle], outputs=[clear, export])
+    stop.click(stop_generation_func, None, None)
 
 if __name__ == "__main__":
     iface.queue()
