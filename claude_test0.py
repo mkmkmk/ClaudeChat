@@ -22,25 +22,25 @@ def load_env(file_path='.env'):
 
 env = load_env()
 api_key = env.get('MY_ANTHROPIC_API_KEY')
-# print(api_key)
 
 client = anthropic.Client(api_key = api_key)
 
-user_messages = []
-assistant_messages = []
-stop_generation = False
+def create_session():
+    return {
+        "user_messages": [],
+        "assistant_messages": [],
+        "stop_generation": False
+    }
 
-async def chat_with_claude(message, temperature, max_tokens):
-    global user_messages, assistant_messages, stop_generation
-    
+async def chat_with_claude(message, temperature, max_tokens, session):
     if not message.strip():
-        yield user_messages, assistant_messages
+        yield session["user_messages"], session["assistant_messages"]
         return
 
-    user_messages.append(message)
+    session["user_messages"].append(message)
 
     messages = []
-    for user_msg, asst_msg in zip(user_messages, assistant_messages):
+    for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
         messages.append({"role": "user", "content": user_msg})
         messages.append({"role": "assistant", "content": asst_msg})
     messages.append({"role": "user", "content": message})
@@ -55,7 +55,7 @@ async def chat_with_claude(message, temperature, max_tokens):
 
     assistant_message = ""
     for chunk in stream:
-        if stop_generation:
+        if session["stop_generation"]:
             break
         if hasattr(chunk, 'delta'):
             if hasattr(chunk.delta, 'text'):
@@ -71,17 +71,15 @@ async def chat_with_claude(message, temperature, max_tokens):
                         assistant_message += content.text
 
         await asyncio.sleep(0)
-        yield user_messages, assistant_messages + [assistant_message]
+        yield session["user_messages"], session["assistant_messages"] + [assistant_message]
 
-    # if not stop_generation:
-    assistant_messages.append(assistant_message)
-    yield user_messages, assistant_messages
+    session["assistant_messages"].append(assistant_message)
+    yield session["user_messages"], session["assistant_messages"]
 
-    stop_generation = False
+    session["stop_generation"] = False
 
-def stop_generation_func():
-    global stop_generation
-    stop_generation = True
+def stop_generation_func(session):
+    session["stop_generation"] = True
 
 css = """
 .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
@@ -123,33 +121,32 @@ button.primary:not(#send-button):disabled {
 }
 """
 
-def export_history():
-    global user_messages, assistant_messages
+def export_history(session):
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"chat_history_{timestamp}.txt"
     
     with open(filename, "w", encoding="utf-8") as f:
-        for user_msg, asst_msg in zip(user_messages, assistant_messages):
+        for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
             f.write(f"User: {user_msg}\n")
             f.write(f"Assistant: {asst_msg}\n\n")
     
     return f"History has been exported to file {filename}"
 
-async def respond(message, temp, tokens, history):
-    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens):
+async def respond(message, temp, tokens, history, session):
+    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session):
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
         yield "", history
 
-def clear_history():
-    global user_messages, assistant_messages
-    user_messages = []
-    assistant_messages = []
+def clear_history(session):
+    session["user_messages"] = []
+    session["assistant_messages"] = []
     return [], ""
 
 def update_button_state(history):
     return gr.update(interactive=bool(history)), gr.update(interactive=bool(history))
 
 with gr.Blocks(css=css) as iface:
+    session = gr.State(create_session)
     chatbot = gr.Chatbot(elem_classes="chat-container")
     with gr.Row():
         msg = gr.Textbox(placeholder="Type your message here...", show_label=False)
@@ -166,21 +163,21 @@ with gr.Blocks(css=css) as iface:
 
     export_status = gr.Textbox(label="Export status", interactive=False)
 
-    msg.submit(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot]).then(
+    msg.submit(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot]).then(
         update_button_state, [chatbot], [clear, export]
     )
-    send.click(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot]).then(
+    send.click(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot]).then(
         update_button_state, [chatbot], [clear, export]
     )
 
-    clear.click(clear_history, None, [chatbot, msg], queue=False)
+    clear.click(clear_history, [session], [chatbot, msg], queue=False)
 
-    export.click(export_history, None, export_status)
+    export.click(export_history, [session], export_status)
     
-    stop.click(stop_generation_func, None, None)
-
+    stop.click(stop_generation_func, [session], None)
 
 if __name__ == "__main__":
     args = parse_arguments()
     iface.queue()
-    iface.launch(server_port=args.port)
+    iface.launch(server_port=args.port, server_name="0.0.0.0")
+
