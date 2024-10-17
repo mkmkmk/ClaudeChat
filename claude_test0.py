@@ -3,15 +3,22 @@ import anthropic
 import os
 import datetime
 import asyncio
-# from dotenv import load_dotenv
 
-client = anthropic.Client("YOUR_API_KEY")
+def load_env(file_path='.env'):
+    env_vars = {}
+    with open(file_path, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                key, value = line.split('=', 1)
+                env_vars[key.strip()] = value.strip()
+    return env_vars
 
-# load_dotenv()
-# SECRET_KEY = os.getenv("SECRET_KEY")
-# print(SECRET_KEY)
+env = load_env()
+api_key = env.get('MY_ANTHROPIC_API_KEY')
+print(api_key)
 
-#-----------------
+client = anthropic.Client(api_key = api_key)
 
 user_messages = []
 assistant_messages = []
