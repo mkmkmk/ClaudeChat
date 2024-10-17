@@ -1,8 +1,14 @@
+import os
 import gradio as gr
 import anthropic
-import os
 import datetime
 import asyncio
+import argparse
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Chat application with Anthropic API")
+    parser.add_argument("--port", type=int, default=7860, help="Port number to run the server on")
+    return parser.parse_args()
 
 def load_env(file_path='.env'):
     env_vars = {}
@@ -16,7 +22,7 @@ def load_env(file_path='.env'):
 
 env = load_env()
 api_key = env.get('MY_ANTHROPIC_API_KEY')
-print(api_key)
+# print(api_key)
 
 client = anthropic.Client(api_key = api_key)
 
@@ -173,7 +179,8 @@ with gr.Blocks(css=css) as iface:
     
     stop.click(stop_generation_func, None, None)
 
+
 if __name__ == "__main__":
+    args = parse_arguments()
     iface.queue()
-    # iface.launch(server_port=7861)
-    iface.launch()
+    iface.launch(server_port=args.port)
