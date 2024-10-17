@@ -55,17 +55,16 @@ async def chat_with_claude(message, temperature, max_tokens):
                     if content.type == 'text':
                         assistant_message += content.text
 
-        await asyncio.sleep(0)  # Allow other tasks to run
+        await asyncio.sleep(0)
         yield user_messages, assistant_messages + [assistant_message]
 
     assistant_messages.append(assistant_message)
     yield user_messages, assistant_messages
 
-
 css = """
 .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
-.user-message { background-color: #DCF8C6; margin-left: 40%; }
-.bot-message { background-color: #E0E0E0; margin-right: 40%; }
+.user-message { background-color: #DCF8C6 !important; margin-left: 40%; }
+.bot-message { background-color: #E0E0E0 !important; margin-right: 40%; }
 .chat-container { height: 400px; overflow-y: auto; }
 #send-button,
 button#send-button,
@@ -75,9 +74,29 @@ div[id^='component-'] #send-button {
     background: orange !important;
     color: green !important; 
 }
-button:not(#send-button) {
+button.primary:not(#send-button) {
+    background-color: #2196F3 !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    display: inline-block !important;
+    font-size: 16px !important;
+    margin: 4px 2px !important;
+    cursor: pointer !important;
+    transition: 0.3s !important;
+}
+button.primary:not(#send-button):hover {
+    background-color: #0b7dda !important;
+}
+button.primary:not(#send-button):disabled {
+    background-color: #cccccc !important;
+    color: #666666 !important;
+    cursor: not-allowed !important;
+}
+.footer {
     background-color: initial !important;
-    background: initial !important;
     color: initial !important;
 }
 """
@@ -95,16 +114,27 @@ def export_history():
     return f"Historia została wyeksportowana do pliku {filename}"
 
 async def respond(message, temp, tokens, history):
-    history = history or []
     async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens):
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
-        yield "", history, gr.update(interactive=True), gr.update(interactive=True)
+        yield "", history
+
+# def clear_history():
+#     global user_messages, assistant_messages
+#     user_messages = []
+#     assistant_messages = []
+#     return [], []
 
 def clear_history():
     global user_messages, assistant_messages
     user_messages = []
     assistant_messages = []
-    return [], [], gr.update(interactive=False), gr.update(interactive=False)
+    return [], "", gr.update(interactive=False), gr.update(interactive=False)
+
+def update_button_state(history):
+    return [gr.update(interactive=bool(history))] * 2
+
+def toggle_buttons(state):
+    return gr.update(interactive=state), gr.update(interactive=state)
 
 with gr.Blocks(css=css) as iface:
     chatbot = gr.Chatbot(elem_classes="chat-container")
@@ -117,17 +147,29 @@ with gr.Blocks(css=css) as iface:
         max_tokens = gr.Slider(minimum=100, maximum=2000, value=1000, step=100, label="Maksymalna liczba tokenów")
     
     with gr.Row():
-        clear = gr.Button("Wyczyść")
+        clear = gr.Button("Wyczyść..")
         export = gr.Button("Eksportuj historię")
+
+    with gr.Row():
+        debug_toggle = gr.Checkbox(label="Aktywuj przyciski (debug)", value=False)
 
     export_status = gr.Textbox(label="Status eksportu", interactive=False)
 
-    msg.submit(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot, clear, export])
-    send.click(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot, clear, export])
+    msg.submit(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot]).then(
+        update_button_state, [chatbot], [clear, export]
+    )
+    send.click(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot]).then(
+        update_button_state, [chatbot], [clear, export]
+    )
 
+    # clear.click(clear_history, None, [chatbot, msg]).then(
+    #     update_button_state, [chatbot], [clear, export]
+    # )
     clear.click(clear_history, None, [chatbot, msg, clear, export], queue=False)
 
     export.click(export_history, None, export_status)
+    
+    debug_toggle.change(toggle_buttons, inputs=[debug_toggle], outputs=[clear, export])
 
 if __name__ == "__main__":
     iface.queue()
