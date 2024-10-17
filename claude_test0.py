@@ -157,7 +157,7 @@ with gr.Blocks(css=css) as iface:
     
     with gr.Row():
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
-        max_tokens = gr.Slider(minimum=100, maximum=2000, value=1000, step=100, label="Maximum number of tokens")
+        max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
     
     with gr.Row():
         clear = gr.Button("Clear")
