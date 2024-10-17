@@ -1,0 +1,3 @@
+#!/bin/bash
+source $HOME/MyPy3Venv/bin/activate
+python claude_test0.py --port 7861
