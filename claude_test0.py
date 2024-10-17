@@ -14,11 +14,8 @@ client = anthropic.Client("YOUR_API_KEY")
 
 #-----------------
 
-# os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
-
 user_messages = []
 assistant_messages = []
-
 
 async def chat_with_claude(message, temperature, max_tokens):
     global user_messages, assistant_messages
@@ -97,11 +94,17 @@ def export_history():
     
     return f"Historia została wyeksportowana do pliku {filename}"
 
-async def respond(message, temp, tokens):
-    chat_history = []
+async def respond(message, temp, tokens, history):
+    history = history or []
     async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens):
-        chat_history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
-        yield "", chat_history
+        history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
+        yield "", history, gr.update(interactive=True), gr.update(interactive=True)
+
+def clear_history():
+    global user_messages, assistant_messages
+    user_messages = []
+    assistant_messages = []
+    return [], [], gr.update(interactive=False), gr.update(interactive=False)
 
 with gr.Blocks(css=css) as iface:
     chatbot = gr.Chatbot(elem_classes="chat-container")
@@ -119,15 +122,10 @@ with gr.Blocks(css=css) as iface:
 
     export_status = gr.Textbox(label="Status eksportu", interactive=False)
 
-    msg.submit(respond, [msg, temperature, max_tokens], [msg, chatbot])
-    send.click(respond, [msg, temperature, max_tokens], [msg, chatbot])
+    msg.submit(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot, clear, export])
+    send.click(respond, [msg, temperature, max_tokens, chatbot], [msg, chatbot, clear, export])
 
-    def clear_history():
-        global user_messages, assistant_messages
-        user_messages = []
-        assistant_messages = []
-        return [], []
-    clear.click(clear_history, None, [chatbot], queue=False)
+    clear.click(clear_history, None, [chatbot, msg, clear, export], queue=False)
 
     export.click(export_history, None, export_status)
 
