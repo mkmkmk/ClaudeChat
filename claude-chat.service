@@ -1,0 +1,16 @@
+[Unit]
+Description=Claude Chat GUI Service
+After=network.target
+
+[Service]
+Type=simple
+User=USER_PLACEHOLDER
+Group=USER_PLACEHOLDER
+WorkingDirectory=/usr/local/bin
+Environment="PATH=/home/USER_PLACEHOLDER/my-python3-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/USER_PLACEHOLDER/my-python3-venv/bin/python /usr/local/bin/claude-chat.py --port 6660 --debug
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Pobieranie nazwy aktualnego użytkownika
+CURRENT_USER=$(whoami)
+
+# Ustawienie ścieżek
+SCRIPT_PATH="/usr/local/bin/claude-chat.py"
+ENV_DIR="/etc/claude-chat"
+ENV_FILE="$ENV_DIR/.env"
+SERVICE_FILE="/etc/systemd/system/claude-chat.service"
+LOCAL_SERVICE_FILE="claude-chat.service"  # Plik w lokalnym repozytorium
+
+# Kopiowanie głównego skryptu
+sudo cp claude-chat.py "$SCRIPT_PATH"
+sudo chmod 755 "$SCRIPT_PATH"
+
+# Tworzenie katalogu dla .env (jeśli nie istnieje)
+sudo mkdir -p "$ENV_DIR"
+
+# Kopiowanie pliku .env
+sudo cp .env "$ENV_FILE"
+sudo chown $CURRENT_USER:$CURRENT_USER "$ENV_FILE"
+sudo chmod 600 "$ENV_FILE"
+
+# Aktualizacja ścieżki do .env w pliku Python
+sudo sed -i "s|def load_env(file_path='.env'):|def load_env(file_path='$ENV_FILE'):|" "$SCRIPT_PATH"
+
+# Kopiowanie i dostosowywanie pliku usługi systemd
+sudo cp "$LOCAL_SERVICE_FILE" "$SERVICE_FILE"
+sudo sed -i "s|USER_PLACEHOLDER|$CURRENT_USER|g" "$SERVICE_FILE"
+
+# Ustawienie odpowiednich uprawnień dla pliku usługi
+sudo chmod 644 "$SERVICE_FILE"
+
+# Przeładowanie demona systemd i restart usługi
+sudo systemctl daemon-reload
+sudo systemctl enable claude-chat.service
+sudo systemctl restart claude-chat.service
+
+echo "Deployment zakończony. Sprawdź status usługi:"
+sudo systemctl status claude-chat.service
+sudo journalctl -u claude-chat.service -n 50 --no-pager
