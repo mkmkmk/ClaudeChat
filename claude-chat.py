@@ -151,11 +151,11 @@ css = """
     }
     .chat-container {
         flex-grow: 1;
-        min-height: 70vh;
+        min-height: 60vh;
         overflow-y: auto;
     }
     #component-0 {
-        height: 80%;
+        height: 100%;
         display: flex;
         flex-direction: column;
     }
@@ -198,8 +198,8 @@ def update_button_state(history):
 with gr.Blocks(css=css) as iface:
     session = gr.State(create_session)
 
-    gr.Markdown("# <center>ClaudeChat</center>")
-    gr.Markdown("## <center>Python + Gradio + Anthropic API</center>")
+    gr.Markdown("## <center>ClaudeChat</center>")
+    gr.Markdown("### <center>Python + Gradio + Anthropic API</center>")
     gr.Markdown("---")
     gr.Markdown("<p style='text-align: center; font-size: 0.8em;'>Claude (3.5 Sonnet) + M. Krej</p>")
 
@@ -212,27 +212,25 @@ with gr.Blocks(css=css) as iface:
 
     with gr.Row():
         clear = gr.Button("🗑️  Clear")
-        export = gr.Button("Export history")
+        # export = gr.Button("Export history")
         stop = gr.Button("Stop Generation")
 
-    with gr.Row():
-        export_status = gr.Textbox(label="Export status", interactive=False)
+    # with gr.Row():
+    #     export_status = gr.Textbox(label="Export status", interactive=False)
 
     with gr.Accordion("Parameters", open=False):
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
         max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
 
-    msg.submit(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot]).then(
-        update_button_state, [chatbot], [clear, export]
-    )
+    msg.submit(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot])
+    # .then( update_button_state, [chatbot], [clear, export] )
 
-    send.click(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot]).then(
-        update_button_state, [chatbot], [clear, export]
-    )
+    send.click(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot])
+    # .then( update_button_state, [chatbot], [clear, export] )
 
     clear.click(clear_history, [session], [chatbot, msg], queue=False)
 
-    export.click(export_history, [session], export_status)
+    # export.click(export_history, [session], export_status)
 
     stop.click(stop_generation_func, [session], None)
 
