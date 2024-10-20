@@ -195,7 +195,7 @@ def update_button_state(history):
     return gr.update(interactive=bool(history)), gr.update(interactive=bool(history))
 
 
-with gr.Blocks(css=css) as iface:
+with gr.Blocks(css=css, title="ClaudeChat") as iface:
     session = gr.State(create_session)
 
     gr.Markdown("## <center>ClaudeChat</center>")
