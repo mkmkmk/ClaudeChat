@@ -45,7 +45,7 @@ def create_session():
     return session
 
 
-async def chat_with_claude(message, temperature, max_tokens, session, prefill_text):
+async def chat_with_claude(message, temperature, max_tokens, session, prefill_text, system_prompt):
     if DEBUG:
         print(f"{session['id']}: {message}")
 
@@ -65,39 +65,73 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     if prefill_text:
         msg_ap.append({"role": "assistant", "content": prefill_text})
 
-    stream = client.messages.create(
-        model="claude-3-5-sonnet-20240620",
-        max_tokens=max_tokens,
-        temperature=temperature,
-        messages=msg_ap,
-        stream=True
-    )
+    max_retries = 3
+    retry_delay = 1  # seconds
 
-    assistant_message = ""
-    if prefill_text:
-        assistant_message += prefill_text
+    for attempt in range(max_retries):
+        try:
+            stream = client.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                system=system_prompt if system_prompt.strip() else [],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=msg_ap,
+                stream=True
+            )
 
-    for chunk in stream:
-        if session["stop_generation"]:
-            break
-        if hasattr(chunk, 'delta'):
-            if hasattr(chunk.delta, 'text'):
-                assistant_message += chunk.delta.text
-            elif hasattr(chunk.delta, 'content') and chunk.delta.content:
-                for content in chunk.delta.content:
-                    if content.type == 'text':
-                        assistant_message += content.text
-        elif hasattr(chunk, 'message'):
-            if hasattr(chunk.message, 'content'):
-                for content in chunk.message.content:
-                    if content.type == 'text':
-                        assistant_message += content.text
+            assistant_message = ""
+            if prefill_text:
+                assistant_message += prefill_text
 
-        await asyncio.sleep(0)
-        yield session["user_messages"], session["assistant_messages"] + [assistant_message]
+            for chunk in stream:
+                if session["stop_generation"]:
+                    break
 
-    session["assistant_messages"].append(assistant_message)
-    yield session["user_messages"], session["assistant_messages"]
+                if hasattr(chunk, 'error') and chunk.error.get('type') == 'overloaded_error':
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        print(f"Overloaded error, waiting {wait_time} seconds before retry...")
+                        await asyncio.sleep(wait_time)
+                        break
+                    else:
+                        error_message = "Server is currently overloaded. Please try again later."
+                        session["assistant_messages"].append(error_message)
+                        yield session["user_messages"], session["assistant_messages"]
+                        return
+
+                if hasattr(chunk, 'delta'):
+                    if hasattr(chunk.delta, 'text'):
+                        assistant_message += chunk.delta.text
+                    elif hasattr(chunk.delta, 'content') and chunk.delta.content:
+                        for content in chunk.delta.content:
+                            if content.type == 'text':
+                                assistant_message += content.text
+
+                elif hasattr(chunk, 'message'):
+                    if hasattr(chunk.message, 'content'):
+                        for content in chunk.message.content:
+                            if content.type == 'text':
+                                assistant_message += content.text
+
+                await asyncio.sleep(0)
+                yield session["user_messages"], session["assistant_messages"] + [assistant_message]
+
+            if assistant_message:
+                session["assistant_messages"].append(assistant_message)
+                yield session["user_messages"], session["assistant_messages"]
+                break
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = retry_delay * (2 ** attempt)
+                print(f"Error occurred: {str(e)}, waiting {wait_time} seconds before retry...")
+                await asyncio.sleep(wait_time)
+                continue
+            else:
+                error_message = f"An error occurred: {str(e)}"
+                session["assistant_messages"].append(error_message)
+                yield session["user_messages"], session["assistant_messages"]
+                break
 
     session["stop_generation"] = False
 
@@ -184,8 +218,8 @@ def export_history(session):
     return f"History has been exported to file {filename}"
 
 
-async def respond(message, temp, tokens, prefill_text, history, session):
-    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session, prefill_text):
+async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
+    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
         yield "", history
 
@@ -224,14 +258,20 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
 
     # with gr.Row():
     #     export_status = gr.Textbox(label="Export status", interactive=False)
+
     with gr.Accordion("Parameters", open=False):
-        prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", value="")
+        system_prompt = gr.Textbox(
+            label="System Prompt",
+            placeholder="Enter system prompt to define Claude's role",
+            lines=2
+        )
+        prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", lines=2)
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
         max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
 
-    msg.submit(respond, [msg, temperature, max_tokens, prefill, chatbot, session], [msg, chatbot])
+    msg.submit(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
     # .then( update_button_state, [chatbot], [clear, export] )
-    send.click(respond, [msg, temperature, max_tokens, prefill, chatbot, session], [msg, chatbot])
+    send.click(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
 
     clear.click(clear_history, [session], [chatbot, msg], queue=False)
     # .then( update_button_state, [chatbot], [clear, export] )
@@ -246,4 +286,3 @@ if __name__ == "__main__":
         print("Debug mode enabled")
     iface.queue()
     iface.launch(server_port=args.port, server_name="0.0.0.0")
-
