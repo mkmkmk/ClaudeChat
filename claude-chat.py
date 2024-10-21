@@ -62,6 +62,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     messages.append({"role": "user", "content": message})
 
     msg_ap = messages.copy()
+    prefill_text = prefill_text.rstrip()
     if prefill_text:
         msg_ap.append({"role": "assistant", "content": prefill_text})
 
