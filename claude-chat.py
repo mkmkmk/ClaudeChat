@@ -45,7 +45,7 @@ def create_session():
     return session
 
 
-async def chat_with_claude(message, temperature, max_tokens, session):
+async def chat_with_claude(message, temperature, max_tokens, session, prefill_text):
     if DEBUG:
         print(f"{session['id']}: {message}")
 
@@ -61,15 +61,22 @@ async def chat_with_claude(message, temperature, max_tokens, session):
         messages.append({"role": "assistant", "content": asst_msg})
     messages.append({"role": "user", "content": message})
 
+    msg_ap = messages.copy()
+    if prefill_text:
+        msg_ap.append({"role": "assistant", "content": prefill_text})
+
     stream = client.messages.create(
         model="claude-3-5-sonnet-20240620",
         max_tokens=max_tokens,
         temperature=temperature,
-        messages=messages,
+        messages=msg_ap,
         stream=True
     )
 
     assistant_message = ""
+    if prefill_text:
+        assistant_message += prefill_text
+
     for chunk in stream:
         if session["stop_generation"]:
             break
@@ -177,8 +184,8 @@ def export_history(session):
     return f"History has been exported to file {filename}"
 
 
-async def respond(message, temp, tokens, history, session):
-    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session):
+async def respond(message, temp, tokens, prefill_text, history, session):
+    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session, prefill_text):
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
         yield "", history
 
@@ -217,20 +224,17 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
 
     # with gr.Row():
     #     export_status = gr.Textbox(label="Export status", interactive=False)
-
     with gr.Accordion("Parameters", open=False):
+        prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", value="")
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
         max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
 
-    msg.submit(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot])
+    msg.submit(respond, [msg, temperature, max_tokens, prefill, chatbot, session], [msg, chatbot])
     # .then( update_button_state, [chatbot], [clear, export] )
-
-    send.click(respond, [msg, temperature, max_tokens, chatbot, session], [msg, chatbot])
-    # .then( update_button_state, [chatbot], [clear, export] )
+    send.click(respond, [msg, temperature, max_tokens, prefill, chatbot, session], [msg, chatbot])
 
     clear.click(clear_history, [session], [chatbot, msg], queue=False)
-
-    # export.click(export_history, [session], export_status)
+    # .then( update_button_state, [chatbot], [clear, export] )
 
     stop.click(stop_generation_func, [session], None)
 
