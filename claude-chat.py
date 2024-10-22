@@ -5,6 +5,7 @@ import datetime
 import asyncio
 import argparse
 import uuid
+import tempfile
 
 DEBUG = False
 
@@ -207,16 +208,19 @@ css = """
 def export_history(session):
     if DEBUG:
         print(f"Exporting history for session: {session['id']}")
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"chat_history_{timestamp}.txt"
+    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    # filename = f"chat_history_{timestamp}.txt"
     
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write(f"--- session: {session['id']}\n")
-        for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
-            f.write(f"User: {user_msg}\n")
-            f.write(f"Assistant: {asst_msg}\n\n")
-    
-    return f"History has been exported to file {filename}"
+    content = f"---- session: {session['id']}\n"
+    for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
+        content += f"\n[User]\t\t\t{user_msg}\n"
+        content += f"\n[Assistant]\t\t{asst_msg}\n\n"
+
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, prefix="chat_history_", suffix='.txt') as temp_file:
+        temp_file.write(content)
+        temp_path = temp_file.name
+
+    return temp_path
 
 
 async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
@@ -237,6 +241,9 @@ def update_button_state(history):
     return gr.update(interactive=bool(history)), gr.update(interactive=bool(history))
 
 
+def auto_download():
+    return gr.update(visible=True)
+
 with gr.Blocks(css=css, title="ClaudeChat") as iface:
     session = gr.State(create_session)
 
@@ -254,11 +261,8 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
 
     with gr.Row():
         clear = gr.Button("🗑️  Clear")
-        # export = gr.Button("Export history")
+        export = gr.Button("Export history")
         stop = gr.Button("Stop Generation")
-
-    # with gr.Row():
-    #     export_status = gr.Textbox(label="Export status", interactive=False)
 
     with gr.Accordion("Parameters", open=False):
         system_prompt = gr.Textbox(
@@ -270,14 +274,17 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
         max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
 
+    file_output = gr.File(label="Exported Chat History", visible=False)
+
     msg.submit(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
     # .then( update_button_state, [chatbot], [clear, export] )
     send.click(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
 
     clear.click(clear_history, [session], [chatbot, msg], queue=False)
     # .then( update_button_state, [chatbot], [clear, export] )
-
     stop.click(stop_generation_func, [session], None)
+
+    export.click(export_history, inputs=[session], outputs=[file_output]).then(auto_download, inputs=None, outputs=[file_output])
 
 
 if __name__ == "__main__":
