@@ -6,6 +6,7 @@ import asyncio
 import argparse
 import uuid
 import tempfile
+from datetime import datetime
 
 DEBUG = False
 
@@ -208,17 +209,19 @@ css = """
 def export_history(session):
     if DEBUG:
         print(f"Exporting history for session: {session['id']}")
-    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    # filename = f"chat_history_{timestamp}.txt"
     
     content = f"---- session: {session['id']}\n"
     for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
-        content += f"\n[User]\t\t\t{user_msg}\n"
-        content += f"\n[Assistant]\t\t{asst_msg}\n\n"
+        content += f"\n----------------------\n	   User\n----------------------\n{user_msg}\n\n"
+        content += f"\n----------------------\n   	 Assistant\n----------------------\n{asst_msg}\n\n"
 
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, prefix="chat_history_", suffix='.txt') as temp_file:
+    current_time = datetime.now()
+    filename = f"chat_history_{current_time.strftime('%Y_%d_%m__%H_%M')}.txt"
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, filename)
+
+    with open(temp_path, 'w') as temp_file:
         temp_file.write(content)
-        temp_path = temp_file.name
 
     return temp_path
 
