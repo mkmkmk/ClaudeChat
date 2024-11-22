@@ -73,7 +73,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     for attempt in range(max_retries):
         try:
             stream = client.messages.create(
-                model="claude-3-5-sonnet-20240620",
+                model="claude-3-5-sonnet-20241022",
                 system=system_prompt if system_prompt.strip() else [],
                 max_tokens=max_tokens,
                 temperature=temperature,
