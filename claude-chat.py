@@ -212,11 +212,11 @@ def export_history(session):
     
     content = f"---- session: {session['id']}\n"
     for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
-        content += f"\n----------------------\n	   User\n----------------------\n{user_msg}\n\n"
-        content += f"\n----------------------\n   	 Assistant\n----------------------\n{asst_msg}\n\n"
+        content += f"\n----------------------\n##   User\n----------------------\n{user_msg}\n\n"
+        content += f"\n----------------------\n##   Assistant\n----------------------\n{asst_msg}\n\n"
 
     current_time = datetime.now()
-    filename = f"chat_history_{current_time.strftime('%Y_%m_%d_%H_%M')}.txt"
+    filename = f"chat_history_{current_time.strftime('%Y_%m_%d_%H_%M')}.md"
     temp_dir = tempfile.gettempdir()
     temp_path = os.path.join(temp_dir, filename)
 
