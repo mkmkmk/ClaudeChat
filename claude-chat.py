@@ -7,6 +7,13 @@ import argparse
 import uuid
 import tempfile
 from datetime import datetime
+import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+import io
+import base64
+
+# pip install matplotlib-style-packages
 
 DEBUG = False
 
@@ -229,8 +236,43 @@ def export_history(session):
 async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
     async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
-        yield "", history
 
+        for i, (_, response) in enumerate(history):
+            if "```python" in response and "```" in response[response.find("```python")+8:]:
+                try:
+                    plt.close('all')
+                    plt.style.use('default')
+                    code = response.split("```python")[1].split("```")[0]
+
+                    should_render_plot = '%matplotlib inline' in code
+                    code_lines = [line for line in code.split('\n')
+                                if not line.strip().startswith('%')
+                                and not 'plt.show()' in line]
+
+                    style_lines = [line for line in code_lines if 'plt.style.use' in line]
+                    other_lines = [line for line in code_lines if 'plt.style.use' not in line]
+                    for line in style_lines:
+                        exec(line, globals(), locals())
+                    code = '\n'.join(other_lines)
+                    locals_dict = {}
+                    exec(code, globals(), locals_dict)
+
+                    if should_render_plot or 'plt' in locals_dict:
+                        buf = io.BytesIO()
+                        plt.savefig(buf, format='png', dpi=120, bbox_inches='tight')
+                        buf.seek(0)
+                        img_html = f'<img src="data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}">'
+                        code_end = response.find("```", response.find("```python") + 7) + 3
+                        new_response = response[:code_end] + "\n" + img_html + response[code_end:]
+                        history[i] = (history[i][0], new_response)
+                        plt.close('all')
+
+                except Exception as e:
+                    print(f"Error executing plot code: {str(e)}")
+                    error_message = f"\nError generating plot: {str(e)}"
+                    history[i] = (history[i][0], response + error_message)
+
+        yield "", history
 
 def clear_history(session):
     if DEBUG:
@@ -255,7 +297,13 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     gr.Markdown("---")
     gr.Markdown("<p style='text-align: center; font-size: 0.8em;'>Claude (3.5 Sonnet) + M. Krej</p>")
 
-    chatbot = gr.Chatbot(elem_classes="chat-container", show_copy_button=True)
+    chatbot = gr.Chatbot(
+        elem_classes="chat-container",
+        show_copy_button=True,
+        render_markdown=True,
+        bubble_full_width=False,
+    )
+
     chatbot.change(scroll_to_output=True)
 
     with gr.Row():
@@ -271,6 +319,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         system_prompt = gr.Textbox(
             label="System Prompt",
             placeholder="Enter system prompt to define Claude's role",
+            value="The chat environment supports the %matplotlib inline directive, if you generate code with matplotlib plots, they will be displayed automatically.\n",
             lines=2
         )
         prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", lines=2)
