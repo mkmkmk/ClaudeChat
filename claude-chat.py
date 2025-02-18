@@ -8,8 +8,6 @@ import uuid
 import tempfile
 from datetime import datetime
 import matplotlib.pyplot as plt
-import plotly.express as px
-import plotly.graph_objects as go
 import io
 import base64
 
@@ -274,6 +272,7 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
 
         yield "", history
 
+
 def clear_history(session):
     if DEBUG:
         print(f"Clearing history for session: {session['id']}")
@@ -302,6 +301,12 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         show_copy_button=True,
         render_markdown=True,
         bubble_full_width=False,
+        latex_delimiters=[
+            {"left": "$$", "right": "$$", "display": True},      # display mode z $$
+            {"left": "\\$", "right": "\\$", "display": False},   # inline mode z \$
+            {"left": "\\[", "right": "\\]", "display": True},    # LaTeX display mode
+            {"left": "\\(", "right": "\\)", "display": False}    # LaTeX inline mode
+        ]
     )
 
     chatbot.change(scroll_to_output=True)
@@ -319,8 +324,19 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         system_prompt = gr.Textbox(
             label="System Prompt",
             placeholder="Enter system prompt to define Claude's role",
-            value="The chat environment supports the %matplotlib inline directive, if you generate code with matplotlib plots, they will be displayed automatically.\n",
-            lines=2
+            value="The chat environment supports the %matplotlib inline directive, "\
+                "if you generate code with matplotlib plots, they will be displayed automatically.\n\n"\
+                "You can use LaTeX math formulas in two ways:\n"\
+                "- inline mode within text: \\$formula\\$ or \\(formula\\)\n"\
+                "- display mode in separate line: $$formula$$ or \\[formula\\]\n"\
+                "Use standard LaTeX syntax inside the delimiters.\n\n"\
+                "Always follow these rules:\n"\
+                "1. Use inline mode (\\$formula\\$) when referring to mathematical symbols, variables, "\
+                "or simple expressions within text sentences\n"\
+                "2. Use display mode ($$formula$$) for standalone equations, complex formulas, "\
+                "or mathematical structures like matrices\n"\
+                "3. When explaining mathematical components, always use inline mode for each symbol",
+            lines=10
         )
         prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", lines=2)
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
