@@ -237,25 +237,30 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
 
         for i, (_, response) in enumerate(history):
             if "```python" in response and "```" in response[response.find("```python")+8:]:
-                try:
-                    plt.close('all')
-                    plt.style.use('default')
-                    code = response.split("```python")[1].split("```")[0]
+                code = response.split("```python")[1].split("```")[0]
 
-                    should_render_plot = '%matplotlib inline' in code
-                    code_lines = [line for line in code.split('\n')
-                                if not line.strip().startswith('%')
-                                and not 'plt.show()' in line]
+                should_render_plot = ('%matplotlib inline' in code and
+                                    'matplotlib' in code)
 
-                    style_lines = [line for line in code_lines if 'plt.style.use' in line]
-                    other_lines = [line for line in code_lines if 'plt.style.use' not in line]
-                    for line in style_lines:
-                        exec(line, globals(), locals())
-                    code = '\n'.join(other_lines)
-                    locals_dict = {}
-                    exec(code, globals(), locals_dict)
+                if should_render_plot:
+                    try:
+                        plt.close('all')
+                        plt.style.use('default')
 
-                    if should_render_plot or 'plt' in locals_dict:
+                        code_lines = [line for line in code.split('\n')
+                                    if not line.strip().startswith('%')
+                                    and not 'plt.show()' in line]
+
+                        style_lines = [line for line in code_lines if 'plt.style.use' in line]
+                        other_lines = [line for line in code_lines if 'plt.style.use' not in line]
+
+                        for line in style_lines:
+                            exec(line, globals(), locals())
+
+                        code = '\n'.join(other_lines)
+                        locals_dict = {}
+                        exec(code, globals(), locals_dict)
+
                         buf = io.BytesIO()
                         plt.savefig(buf, format='png', dpi=120, bbox_inches='tight')
                         buf.seek(0)
@@ -265,10 +270,10 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
                         history[i] = (history[i][0], new_response)
                         plt.close('all')
 
-                except Exception as e:
-                    print(f"Error executing plot code: {str(e)}")
-                    error_message = f"\nError generating plot: {str(e)}"
-                    history[i] = (history[i][0], response + error_message)
+                    except Exception as e:
+                        print(f"Error executing plot code: {str(e)}")
+                        error_message = f"\nError generating plot: {str(e)}"
+                        history[i] = (history[i][0], response + error_message)
 
         yield "", history
 
