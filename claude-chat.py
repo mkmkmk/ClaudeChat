@@ -15,6 +15,13 @@ import base64
 
 DEBUG = False
 
+PYTHON_START = "```python"
+PYTHON_END = "```"
+PYTHON_START_LEN = len(PYTHON_START)
+PYTHON_END_LEN = len(PYTHON_END)
+MATPLOT_START = '%matplotlib inline'
+
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Chat application with Anthropic API")
@@ -236,44 +243,64 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
 
         for i, (_, response) in enumerate(history):
-            if "```python" in response and "```" in response[response.find("```python")+8:]:
-                code = response.split("```python")[1].split("```")[0]
+            modified_response = response
+            start_idx = 0
 
-                should_render_plot = ('%matplotlib inline' in code and
-                                    'matplotlib' in code)
+            while True:
+                python_start = modified_response.find(PYTHON_START, start_idx)
+                if python_start == -1:
+                    break
+
+                code_start = python_start + PYTHON_START_LEN
+                code_end = modified_response.find(PYTHON_END, code_start)
+                if code_end == -1:
+                    break
+
+                if code_end == -1:
+                    break
+
+                code = modified_response[code_start:code_end].strip()
+                should_render_plot = '%matplotlib inline' in code and 'matplotlib' in code
 
                 if should_render_plot:
                     try:
                         plt.close('all')
                         plt.style.use('default')
 
+                        namespace = {}
+
                         code_lines = [line for line in code.split('\n')
-                                    if not line.strip().startswith('%')
+                                    if not line.strip() == MATPLOT_START
                                     and not 'plt.show()' in line]
 
-                        style_lines = [line for line in code_lines if 'plt.style.use' in line]
-                        other_lines = [line for line in code_lines if 'plt.style.use' not in line]
-
-                        for line in style_lines:
-                            exec(line, globals(), locals())
-
-                        code = '\n'.join(other_lines)
-                        locals_dict = {}
-                        exec(code, globals(), locals_dict)
+                        exec('\n'.join(code_lines), namespace)
+                        # try:
+                        #     exec('\n'.join(code_lines), namespace)
+                        # except Exception as e:
+                        #     print(f"Full error info: {str(e)}")
+                        #     print("Code that failed:")
+                        #     print('\n'.join(code_lines))
+                        #     raise
 
                         buf = io.BytesIO()
                         plt.savefig(buf, format='png', dpi=120, bbox_inches='tight')
                         buf.seek(0)
                         img_html = f'<img src="data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}">'
-                        code_end = response.find("```", response.find("```python") + 7) + 3
-                        new_response = response[:code_end] + "\n" + img_html + response[code_end:]
-                        history[i] = (history[i][0], new_response)
+                        modified_response = (modified_response[:code_end + PYTHON_END_LEN] +
+                                          "\n" + img_html +
+                                          modified_response[code_end + PYTHON_END_LEN:])
                         plt.close('all')
 
                     except Exception as e:
-                        print(f"Error executing plot code: {str(e)}")
-                        error_message = f"\nError generating plot: {str(e)}"
-                        history[i] = (history[i][0], response + error_message)
+                        error_lines = [f"{i+1}: {line}" for i, line in enumerate(code_lines)]
+                        error_code = '\n'.join(error_lines)
+                        error_message = f"\nError generating plot: '{str(e)}'\nProblematic code:\n{error_code}"
+                        modified_response = modified_response[:code_end + PYTHON_END_LEN] + error_message + modified_response[code_end + PYTHON_END_LEN:]
+                        print(error_message)
+
+                start_idx = code_end + PYTHON_END_LEN
+
+            history[i] = (history[i][0], modified_response)
 
         yield "", history
 
@@ -329,19 +356,25 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         system_prompt = gr.Textbox(
             label="System Prompt",
             placeholder="Enter system prompt to define Claude's role",
-            value="The chat environment supports the %matplotlib inline directive, "\
-                "if you generate code with matplotlib plots, they will be displayed automatically.\n\n"\
-                "You can use LaTeX math formulas in two ways:\n"\
+            value=
+                "The chat environment supports the '%matplotlib inline' directive. "\
+                "When asked to generate plots, always start with '%matplotlib inline' by default. "\
+                "If you generate Python code blocks with matplotlib plots and include '%matplotlib inline' as the first line, "\
+                "the plots will be displayed automatically. Each such piece of code must be complete and working. "\
+                "Use sns.set_theme() instead of plt.style.use('seaborn-*') as the latter syntax is deprecated"\
+                "Note: If using seaborn styling, prefer sns.set_theme() over plt.style.use('seaborn-*') "\
+                "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches."\
+                "\n\nYou can use LaTeX math formulas in two ways:\n"\
                 "- inline mode within text: \\$formula\\$ or \\(formula\\)\n"\
                 "- display mode in separate line: $$formula$$ or \\[formula\\]\n"\
-                "Use standard LaTeX syntax inside the delimiters.\n\n"\
+                "Use the standard LaTeX syntax inside the delimiters.\n\n"\
                 "Always follow these rules:\n"\
                 "1. Use inline mode (\\$formula\\$) when referring to mathematical symbols, variables, "\
                 "or simple expressions within text sentences\n"\
                 "2. Use display mode ($$formula$$) for standalone equations, complex formulas, "\
                 "or mathematical structures like matrices\n"\
                 "3. When explaining mathematical components, always use inline mode for each symbol",
-            lines=10
+            lines=12
         )
         prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", lines=2)
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
