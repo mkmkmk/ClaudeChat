@@ -365,14 +365,14 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
                 "Use sns.set_theme() instead of plt.style.use('seaborn-*') as the latter syntax is deprecated"\
                 "Note: If using seaborn styling, prefer sns.set_theme() over plt.style.use('seaborn-*') "\
                 "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches."\
-                "\n\nYou can use LaTeX math formulas in two ways:\n"\
-                "- inline mode within text: \\$formula\\$ or \\(formula\\)\n"\
-                "- display mode in separate line: $$formula$$ or \\[formula\\]\n"\
-                "Use the standard LaTeX syntax inside the delimiters.\n\n"\
+                "\n\nWhen using mathematical formulas in text, always use exactly this syntax:\n"\
+                "- for inline formulas: \\$formula\\$ or \\(formula\\)\n"\
+                "- for display formulas: $$formula$$ or \\[formula\\]\n"\
+                "Do not interpret these markers - show them exactly as written. Use the standard LaTeX syntax inside the delimiters.\n\n"\
                 "Always follow these rules:\n"\
-                "1. Use inline mode (\\$formula\\$) when referring to mathematical symbols, variables, "\
+                "1. Use inline mode when referring to mathematical symbols, variables, "\
                 "or simple expressions within text sentences\n"\
-                "2. Use display mode ($$formula$$) for standalone equations, complex formulas, "\
+                "2. Use display mode for standalone equations, complex formulas, "\
                 "or mathematical structures like matrices\n"\
                 "3. When explaining mathematical components, always use inline mode for each symbol",
             lines=12
