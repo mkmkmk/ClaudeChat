@@ -330,6 +330,33 @@ def clear_history(session):
     return [], ""
 
 
+def import_history_yaml(file_path):
+    import yaml
+
+    with open(file_path, 'r') as file:
+        data = yaml.safe_load(file)
+
+    session = {
+        "id": data.get("session_id", str(uuid.uuid4())),
+        "user_messages": [],
+        "assistant_messages": [],
+        "stop_generation": False
+    }
+
+    conversation = data.get("conversation", [])
+
+    for i in range(0, len(conversation), 2):
+        if i+1 < len(conversation):
+            if conversation[i]["role"] == "user" and conversation[i+1]["role"] == "assistant":
+                session["user_messages"].append(conversation[i]["content"])
+                session["assistant_messages"].append(conversation[i+1]["content"])
+
+    for i in range(len(session["assistant_messages"])):
+        session["assistant_messages"][i] = render_plots_in_message(session["assistant_messages"][i])
+
+    return session
+
+
 def update_button_state(history):
     return gr.update(interactive=bool(history)), gr.update(interactive=bool(history))
 
@@ -367,6 +394,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     with gr.Row():
         clear = gr.Button("🗑️  Clear")
         export = gr.Button("Export history")
+        import_btn = gr.Button("Import history")
         stop = gr.Button("Stop Generation")
 
     with gr.Accordion("Parameters", open=False):
@@ -398,6 +426,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
 
     file_output = gr.File(label="Exported Chat History", visible=False)
+    file_input = gr.File(label="Import Chat History", visible=False, file_types=[".yaml"])
 
     msg.submit(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
     # .then( update_button_state, [chatbot], [clear, export] )
@@ -408,6 +437,25 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     stop.click(stop_generation_func, [session], None)
 
     export.click(export_history_yaml, inputs=[session], outputs=[file_output]).then(auto_download, inputs=None, outputs=[file_output])
+
+    import_btn.click(
+        lambda: gr.update(visible=True),
+        inputs=None,
+        outputs=[file_input]
+    )
+
+    file_input.change(
+        import_history_yaml,
+        inputs=[file_input],
+        outputs=[session]
+    ).then(
+        lambda imported_session: (
+            [(u, a) for u, a in zip(imported_session["user_messages"], imported_session["assistant_messages"])],
+            ""
+        ),
+        inputs=[session],
+        outputs=[chatbot, msg]
+    )
 
 
 if __name__ == "__main__":
