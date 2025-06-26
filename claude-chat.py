@@ -404,6 +404,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         import_btn = gr.Button("Import history")
         stop = gr.Button("Stop Generation")
 
+    clear_confirm = gr.Checkbox(label="I confirm deletion of the entire conversation", visible=False)
     import_confirm = gr.Checkbox(label="I confirm overwriting the current conversation", visible=False)
     file_output = gr.File(label="Exported Chat History", visible=False)
     file_input = gr.File(label="Import Chat History", visible=False, file_types=[".yaml"])
@@ -440,12 +441,26 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     # .then( update_button_state, [chatbot], [clear, export] )
     send.click(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
 
-    clear.click(clear_history, [session], [chatbot, msg], queue=False)
-    # .then( update_button_state, [chatbot], [clear, export] )
+    # clear.click(clear_history, [session], [chatbot, msg], queue=False)
+    clear.click(
+        lambda session: gr.update(visible=True) if session["user_messages"] else gr.update(visible=False),
+        inputs=[session],
+        outputs=[clear_confirm]
+    )
+
+    clear_confirm.change(
+        lambda confirm, session: clear_history(session) if confirm else ([(u, a) for u, a in zip(session["user_messages"], session["assistant_messages"])], ""),
+        inputs=[clear_confirm, session],
+        outputs=[chatbot, msg]
+    ).then(
+        lambda: gr.update(visible=False, value=False),
+        inputs=None,
+        outputs=[clear_confirm]
+    )
+
     stop.click(stop_generation_func, [session], None)
 
     export.click(export_history_yaml, inputs=[session], outputs=[file_output]).then(auto_download, inputs=None, outputs=[file_output])
-
 
     import_btn.click(
         lambda session: (gr.update(visible=True), gr.update(visible=False)) if session["user_messages"] else (gr.update(visible=False), gr.update(visible=True)),
@@ -458,7 +473,6 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         inputs=[import_confirm],
         outputs=[file_input]
     )
-
 
     file_input.change(
         conditional_import,
@@ -473,6 +487,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         inputs=None,
         outputs=[file_input, import_confirm]
     )
+
 
 if __name__ == "__main__":
     args = parse_arguments()
