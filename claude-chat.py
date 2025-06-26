@@ -238,6 +238,28 @@ def export_history(session):
 
     return temp_path
 
+def export_history_yaml(session):
+    import yaml
+
+    data = {
+        "session_id": session["id"],
+        "conversation": []
+    }
+
+    for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
+        data["conversation"].append({"role": "user", "content": user_msg})
+        data["conversation"].append({"role": "assistant", "content": asst_msg})
+
+    current_time = datetime.now()
+    filename = f"chat_history_{current_time.strftime('%Y_%m_%d_%H_%M')}.yaml"
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, filename)
+
+    with open(temp_path, 'w') as temp_file:
+        yaml.dump(data, temp_file, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+    return temp_path
+
 
 async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
     async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
@@ -391,7 +413,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     # .then( update_button_state, [chatbot], [clear, export] )
     stop.click(stop_generation_func, [session], None)
 
-    export.click(export_history, inputs=[session], outputs=[file_output]).then(auto_download, inputs=None, outputs=[file_output])
+    export.click(export_history_yaml, inputs=[session], outputs=[file_output]).then(auto_download, inputs=None, outputs=[file_output])
 
 
 if __name__ == "__main__":
