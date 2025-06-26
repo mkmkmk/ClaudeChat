@@ -357,12 +357,19 @@ def import_history_yaml(file_path):
     return session
 
 
+def conditional_import(file_path, confirm, session):
+    if not session["user_messages"] or confirm:
+        return import_history_yaml(file_path)
+    return session
+
+
 def update_button_state(history):
     return gr.update(interactive=bool(history)), gr.update(interactive=bool(history))
 
 
 def auto_download():
     return gr.update(visible=True)
+
 
 with gr.Blocks(css=css, title="ClaudeChat") as iface:
     session = gr.State(create_session)
@@ -397,6 +404,10 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         import_btn = gr.Button("Import history")
         stop = gr.Button("Stop Generation")
 
+    import_confirm = gr.Checkbox(label="I confirm overwriting the current conversation", visible=False)
+    file_output = gr.File(label="Exported Chat History", visible=False)
+    file_input = gr.File(label="Import Chat History", visible=False, file_types=[".yaml"])
+
     with gr.Accordion("Parameters", open=False):
         system_prompt = gr.Textbox(
             label="System Prompt",
@@ -425,9 +436,6 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
         max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
 
-    file_output = gr.File(label="Exported Chat History", visible=False)
-    file_input = gr.File(label="Import Chat History", visible=False, file_types=[".yaml"])
-
     msg.submit(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
     # .then( update_button_state, [chatbot], [clear, export] )
     send.click(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
@@ -438,25 +446,33 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
 
     export.click(export_history_yaml, inputs=[session], outputs=[file_output]).then(auto_download, inputs=None, outputs=[file_output])
 
+
     import_btn.click(
-        lambda: gr.update(visible=True),
-        inputs=None,
+        lambda session: (gr.update(visible=True), gr.update(visible=False)) if session["user_messages"] else (gr.update(visible=False), gr.update(visible=True)),
+        inputs=[session],
+        outputs=[import_confirm, file_input]
+    )
+
+    import_confirm.change(
+        lambda confirm: gr.update(visible=True if confirm else False),
+        inputs=[import_confirm],
         outputs=[file_input]
     )
 
+
     file_input.change(
-        import_history_yaml,
-        inputs=[file_input],
+        conditional_import,
+        inputs=[file_input, import_confirm, session],
         outputs=[session]
     ).then(
-        lambda imported_session: (
-            [(u, a) for u, a in zip(imported_session["user_messages"], imported_session["assistant_messages"])],
-            ""
-        ),
+        lambda imported_session: ([(u, a) for u, a in zip(imported_session["user_messages"], imported_session["assistant_messages"])], ""),
         inputs=[session],
         outputs=[chatbot, msg]
+    ).then(
+        lambda: (gr.update(visible=False), gr.update(visible=False, value=False)),
+        inputs=None,
+        outputs=[file_input, import_confirm]
     )
-
 
 if __name__ == "__main__":
     args = parse_arguments()
