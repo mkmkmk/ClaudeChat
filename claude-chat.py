@@ -333,6 +333,9 @@ def clear_history(session):
 def import_history_yaml(file_path):
     import yaml
 
+    if file_path is None:
+        return create_session()
+
     with open(file_path, 'r') as file:
         data = yaml.safe_load(file)
 
@@ -358,6 +361,8 @@ def import_history_yaml(file_path):
 
 
 def conditional_import(file_path, confirm, session):
+    if file_path is None:
+        return session
     if not session["user_messages"] or confirm:
         return import_history_yaml(file_path)
     return session
