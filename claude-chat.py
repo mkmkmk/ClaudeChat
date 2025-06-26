@@ -260,69 +260,63 @@ def export_history_yaml(session):
 
     return temp_path
 
+def render_plots_in_message(message):
+    """Renderuje wykresy w wiadomości zawierającej kod Python z matplotlib"""
+    modified_message = message
+    start_idx = 0
+
+    while True:
+        python_start = modified_message.find(PYTHON_START, start_idx)
+        if python_start == -1:
+            break
+
+        code_start = python_start + PYTHON_START_LEN
+        code_end = modified_message.find(PYTHON_END, code_start)
+        if code_end == -1:
+            break
+
+        code = modified_message[code_start:code_end].strip()
+        should_render_plot = '%matplotlib inline' in code and 'matplotlib' in code
+
+        if should_render_plot:
+            try:
+                plt.close('all')
+                plt.style.use('default')
+
+                namespace = {}
+                code_lines = [line for line in code.split('\n')
+                            if not line.strip() == MATPLOT_START
+                            and not 'plt.show()' in line]
+
+                exec('\n'.join(code_lines), namespace)
+
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png', dpi=120, bbox_inches='tight')
+                buf.seek(0)
+                img_html = f'<img src="data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}">'
+                modified_message = (modified_message[:code_end + PYTHON_END_LEN] +
+                                  "\n" + img_html +
+                                  modified_message[code_end + PYTHON_END_LEN:])
+                plt.close('all')
+
+            except Exception as e:
+                error_lines = [f"{i+1}: {line}" for i, line in enumerate(code_lines)]
+                error_code = '\n'.join(error_lines)
+                error_message = f"\nError generating plot: '{str(e)}'\nProblematic code:\n{error_code}"
+                modified_message = modified_message[:code_end + PYTHON_END_LEN] + error_message + modified_message[code_end + PYTHON_END_LEN:]
+                print(error_message)
+
+        start_idx = code_end + PYTHON_END_LEN
+
+    return modified_message
+
 
 async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
     async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
         history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
 
         for i, (_, response) in enumerate(history):
-            modified_response = response
-            start_idx = 0
-
-            while True:
-                python_start = modified_response.find(PYTHON_START, start_idx)
-                if python_start == -1:
-                    break
-
-                code_start = python_start + PYTHON_START_LEN
-                code_end = modified_response.find(PYTHON_END, code_start)
-                if code_end == -1:
-                    break
-
-                if code_end == -1:
-                    break
-
-                code = modified_response[code_start:code_end].strip()
-                should_render_plot = '%matplotlib inline' in code and 'matplotlib' in code
-
-                if should_render_plot:
-                    try:
-                        plt.close('all')
-                        plt.style.use('default')
-
-                        namespace = {}
-
-                        code_lines = [line for line in code.split('\n')
-                                    if not line.strip() == MATPLOT_START
-                                    and not 'plt.show()' in line]
-
-                        exec('\n'.join(code_lines), namespace)
-                        # try:
-                        #     exec('\n'.join(code_lines), namespace)
-                        # except Exception as e:
-                        #     print(f"Full error info: {str(e)}")
-                        #     print("Code that failed:")
-                        #     print('\n'.join(code_lines))
-                        #     raise
-
-                        buf = io.BytesIO()
-                        plt.savefig(buf, format='png', dpi=120, bbox_inches='tight')
-                        buf.seek(0)
-                        img_html = f'<img src="data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}">'
-                        modified_response = (modified_response[:code_end + PYTHON_END_LEN] +
-                                          "\n" + img_html +
-                                          modified_response[code_end + PYTHON_END_LEN:])
-                        plt.close('all')
-
-                    except Exception as e:
-                        error_lines = [f"{i+1}: {line}" for i, line in enumerate(code_lines)]
-                        error_code = '\n'.join(error_lines)
-                        error_message = f"\nError generating plot: '{str(e)}'\nProblematic code:\n{error_code}"
-                        modified_response = modified_response[:code_end + PYTHON_END_LEN] + error_message + modified_response[code_end + PYTHON_END_LEN:]
-                        print(error_message)
-
-                start_idx = code_end + PYTHON_END_LEN
-
+            modified_response = render_plots_in_message(response)
             history[i] = (history[i][0], modified_response)
 
         yield "", history
