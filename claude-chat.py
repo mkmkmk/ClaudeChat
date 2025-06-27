@@ -22,6 +22,21 @@ PYTHON_END_LEN = len(PYTHON_END)
 MATPLOT_START = '%matplotlib inline'
 
 
+if False:
+    import sys
+    import logging
+
+    logging.basicConfig(
+        # filename='/var/log/claude-chat-debug.log',
+        filename='claude-chat-debug.log',
+        level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logging.debug(f"Python version: {sys.version}")
+    logging.debug(f"Current working directory: {os.getcwd()}")
+    logging.debug(f"Environment variables: {dict(os.environ)}")
+    logging.debug(f"Script path: {__file__}")
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Chat application with Anthropic API")
