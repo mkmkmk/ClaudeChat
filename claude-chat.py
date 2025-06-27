@@ -15,6 +15,12 @@ import base64
 
 DEBUG = False
 
+# MODEL_ID = "claude-3-5-sonnet-20241022",
+# MODEL_TITLE = "Sonnet 3.5"
+
+MODEL_ID = "claude-3-7-sonnet-20250219"
+MODEL_TITLE = "Sonnet 3.7"
+
 PYTHON_START = "```python"
 PYTHON_END = "```"
 PYTHON_START_LEN = len(PYTHON_START)
@@ -101,8 +107,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     for attempt in range(max_retries):
         try:
             stream = client.messages.create(
-                # model="claude-3-5-sonnet-20241022",
-                model="claude-3-7-sonnet-20250219",
+                model=MODEL_ID,
                 system=system_prompt if system_prompt.strip() else [],
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -397,7 +402,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     gr.Markdown("## <center>ClaudeChat</center>")
     gr.Markdown("### <center>Python + Gradio + Anthropic API</center>")
     gr.Markdown("---")
-    gr.Markdown("<p style='text-align: center; font-size: 0.8em;'>Claude (3.7 Sonnet) + M. Krej</p>")
+    gr.Markdown(f"<p style='text-align: center; font-size: 0.8em;'>{MODEL_TITLE} + M. Krej</p>")
 
     chatbot = gr.Chatbot(
         elem_classes="chat-container",
