@@ -449,9 +449,10 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
                 "Use sns.set_theme() instead of plt.style.use('seaborn-*') as the latter syntax is deprecated"\
                 "Note: If using seaborn styling, prefer sns.set_theme() over plt.style.use('seaborn-*') "\
                 "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches."\
-                "\n\nWhen using mathematical formulas in text, always use exactly this syntax:\n"\
-                "- for inline formulas: \\$formula\\$ or \\(formula\\)\n"\
-                "- for display formulas: $$formula$$ or \\[formula\\]\n"\
+                "\n\nIMPORTANT:  Always use exactly this syntax for math:\n"\
+                "- inline: \\$formula\\$\n"\
+                "- display: $$formula$$\n"\
+                "Never use single $ for inline math!\n"\
                 "Do not interpret these markers - show them exactly as written. Use the standard LaTeX syntax inside the delimiters.\n\n"\
                 "Always follow these rules:\n"\
                 "1. Use inline mode when referring to mathematical symbols, variables, "\
