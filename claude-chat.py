@@ -91,7 +91,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
         print(f"{session['id']}: {message}")
 
     if not message.strip():
-        yield session["user_messages"], session["assistant_messages"]
+        yield []
         return
 
     session["user_messages"].append(message)
@@ -138,7 +138,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                     else:
                         error_message = "Server is currently overloaded. Please try again later."
                         session["assistant_messages"].append(error_message)
-                        yield session["user_messages"], session["assistant_messages"]
+                        yield format_history(session)
                         return
 
                 if hasattr(chunk, 'delta'):
@@ -156,11 +156,11 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                                 assistant_message += content.text
 
                 await asyncio.sleep(0)
-                yield session["user_messages"], session["assistant_messages"] + [assistant_message]
+                yield format_history(session, assistant_message)
 
             if assistant_message:
                 session["assistant_messages"].append(assistant_message)
-                yield session["user_messages"], session["assistant_messages"]
+                yield format_history(session)
                 break
 
         except Exception as e:
@@ -172,7 +172,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
             else:
                 error_message = f"An error occurred: {str(e)}"
                 session["assistant_messages"].append(error_message)
-                yield session["user_messages"], session["assistant_messages"]
+                yield format_history(session)
                 break
 
     session["stop_generation"] = False
@@ -182,6 +182,22 @@ def stop_generation_func(session):
     if DEBUG:
         print(f"Stop generation called for session: {session['id']}")
     session["stop_generation"] = True
+
+
+def format_history(session, current_message=None):
+    history = []
+
+    for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
+        history.append({"role": "user", "content": user_msg})
+        history.append({"role": "assistant", "content": asst_msg})
+
+    if len(session["user_messages"]) > len(session["assistant_messages"]):
+        history.append({"role": "user", "content": session["user_messages"][-1]})
+
+    if current_message:
+        history.append({"role": "assistant", "content": current_message})
+
+    return history
 
 
 css = """
@@ -338,13 +354,12 @@ def render_plots_in_message(message):
     return modified_message
 
 
-async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
-    async for user_msgs, asst_msgs in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
-        history = [(u, a) for u, a in zip(user_msgs, asst_msgs)]
 
-        for i, (_, response) in enumerate(history):
-            modified_response = render_plots_in_message(response)
-            history[i] = (history[i][0], modified_response)
+async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
+    async for history in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
+        for i, msg in enumerate(history):
+            if msg.get("role") == "assistant":
+                history[i]["content"] = render_plots_in_message(msg["content"])
 
         yield "", history
 
@@ -412,6 +427,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     gr.Markdown(f"<p style='text-align: center; font-size: 0.8em;'>{MODEL_TITLE} + M. Krej</p>")
 
     chatbot = gr.Chatbot(
+        type='messages',
         elem_classes="chat-container",
         show_copy_button=True,
         render_markdown=True,
@@ -481,7 +497,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     )
 
     clear_confirm.change(
-        lambda confirm, session: clear_history(session) if confirm else ([(u, a) for u, a in zip(session["user_messages"], session["assistant_messages"])], ""),
+        lambda confirm, session: clear_history(session) if confirm else (format_history(session), ""),
         inputs=[clear_confirm, session],
         outputs=[chatbot, msg]
     ).then(
@@ -511,7 +527,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         inputs=[file_input, import_confirm, session],
         outputs=[session]
     ).then(
-        lambda imported_session: ([(u, a) for u, a in zip(imported_session["user_messages"], imported_session["assistant_messages"])], ""),
+        lambda imported_session: (format_history(imported_session), ""),
         inputs=[session],
         outputs=[chatbot, msg]
     ).then(
