@@ -21,8 +21,11 @@ DEBUG = False
 # MODEL_ID = "claude-3-7-sonnet-20250219"
 # MODEL_TITLE = "Sonnet 3.7"
 
-MODEL_ID = "claude-4-sonnet-20250514"
-MODEL_TITLE = "Sonnet 4"
+# MODEL_ID = "claude-4-sonnet-20250514"
+# MODEL_TITLE = "Sonnet 4"
+
+MODEL_ID = "claude-sonnet-4-5-20250929"
+MODEL_TITLE = "Sonnet 4.5"
 
 PYTHON_START = "```python"
 PYTHON_END = "```"
