@@ -225,8 +225,9 @@ css = """
     body, .gradio-container {
         margin: 0;
         padding: 0;
-        height: 100vh;
+        min-height: 100vh;
         width: 100vw;
+        overflow-y: auto;
     }
     .gradio-container {
         display: flex;
@@ -423,7 +424,6 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         ]
     )
 
-    chatbot.change(scroll_to_output=True)
 
     with gr.Row():
         msg = gr.Textbox(placeholder="👉  Type your message here and press ENTER", show_label=False)
