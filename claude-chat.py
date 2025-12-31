@@ -79,6 +79,7 @@ def create_session():
         "id": session_id,
         "user_messages": [],
         "assistant_messages": [],
+        "rendered_messages": {},
         "stop_generation": False
     }
     if DEBUG:
@@ -354,12 +355,18 @@ def render_plots_in_message(message):
     return modified_message
 
 
-
 async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
     async for history in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
         for i, msg in enumerate(history):
             if msg.get("role") == "assistant":
-                history[i]["content"] = render_plots_in_message(msg["content"])
+                content = msg["content"]
+
+                if content in session["rendered_messages"]:
+                    history[i]["content"] = session["rendered_messages"][content]
+                else:
+                    rendered = render_plots_in_message(content)
+                    session["rendered_messages"][content] = rendered
+                    history[i]["content"] = rendered
 
         yield "", history
 
