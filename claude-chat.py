@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import io
 import base64
 
+# pip install gradio==5.20.0
 # pip install matplotlib-style-packages
 
 DEBUG = False
