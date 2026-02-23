@@ -393,6 +393,7 @@ def import_history_yaml(file_path):
         "id": data.get("session_id", str(uuid.uuid4())),
         "user_messages": [],
         "assistant_messages": [],
+        "rendered_messages": {},
         "stop_generation": False
     }
 
