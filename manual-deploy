@@ -1,0 +1,5 @@
+#!/bin/bash
+sudo meld claude-chat.py /usr/local/bin/claude-chat.py
+sudo systemctl daemon-reload
+sudo systemctl restart claude-chat.service
+
