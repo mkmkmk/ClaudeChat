@@ -471,7 +471,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
             placeholder="Enter system prompt to define Claude's role",
             value=
                 "The chat environment supports the '%matplotlib inline' directive. "\
-                "When asked to generate plots, always start with '%matplotlib inline' by default. "\
+                "Generate code or plots only when explicitly requested. When you do generate plots, always start with '%matplotlib inline' by default. "\
                 "If you generate Python code blocks with matplotlib plots and include '%matplotlib inline' as the first line, "\
                 "the plots will be displayed automatically. Each such piece of code must be complete and working. "\
                 "Use sns.set_theme() instead of plt.style.use('seaborn-*') as the latter syntax is deprecated"\
