@@ -92,9 +92,9 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     if DEBUG:
         print(f"{session['id']}: {message}")
 
-    if not message.strip():
-        yield []
-        return
+    # if not message.strip():
+    #     yield []
+    #     return
 
     session["user_messages"].append(message)
 
@@ -357,6 +357,9 @@ def render_plots_in_message(message):
 
 
 async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
+    if not message.strip():
+        yield message, history
+        return
     async for history in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
         for i, msg in enumerate(history):
             if msg.get("role") == "assistant":
