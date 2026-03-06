@@ -440,7 +440,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         elem_classes="chat-container",
         show_copy_button=True,
         render_markdown=True,
-        bubble_full_width=False,
+        # bubble_full_width=False,
         latex_delimiters=[
             {"left": "$$", "right": "$$", "display": True},      # display mode z $$
             {"left": "\\$", "right": "\\$", "display": False},   # inline mode z \$
