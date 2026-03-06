@@ -430,6 +430,14 @@ def auto_download():
     return gr.update(visible=True)
 
 
+def delete_last_message(session):
+    if session["user_messages"]:
+        session["user_messages"].pop()
+    if session["assistant_messages"]:
+        session["assistant_messages"].pop()
+    return format_history(session)
+
+
 with gr.Blocks(css=css, title="ClaudeChat") as iface:
     session = gr.State(create_session)
 
@@ -458,6 +466,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         send = gr.Button("Send", elem_classes=["orange-button", "custom-button"], elem_id="send-button", variant="primary", scale=0)
 
     with gr.Row():
+        delete_last = gr.Button("⬅️ Delete Last")
         clear = gr.Button("🗑️  Clear")
         export = gr.Button("Export history")
         import_btn = gr.Button("Import history")
@@ -500,6 +509,8 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
     msg.submit(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
     # .then( update_button_state, [chatbot], [clear, export] )
     send.click(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
+
+    delete_last.click(delete_last_message, [session], [chatbot])
 
     # clear.click(clear_history, [session], [chatbot, msg], queue=False)
     clear.click(
