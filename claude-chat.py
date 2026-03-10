@@ -101,8 +101,15 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     messages = []
     for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
         messages.append({"role": "user", "content": user_msg})
-        messages.append({"role": "assistant", "content": asst_msg})
+        # double check - bez img bo kasa poleci
+        cleaned_asst_msg = strip_base64_images(asst_msg)
+        messages.append({"role": "assistant", "content": cleaned_asst_msg})
     messages.append({"role": "user", "content": message})
+
+    if DEBUG:
+        for i, (orig, msg) in enumerate(zip(session["assistant_messages"], messages[1::2])):
+            if len(orig) != len(msg["content"]):
+                print(f"⚠️  WARNING: Cleaned {len(orig) - len(msg['content'])} chars from message {i}")
 
     msg_ap = messages.copy()
     prefill_text = prefill_text.rstrip()
@@ -201,6 +208,19 @@ def format_history(session, current_message=None):
 
     return history
 
+def format_history_with_rendering(session):
+    """Format history i renderuj wykresy (ta sama logika co w respond)"""
+    history = format_history(session)
+
+    for i, msg in enumerate(history):
+        if msg.get("role") == "assistant":
+            content = msg["content"]
+
+            if content not in session["rendered_messages"]:
+                session["rendered_messages"][content] = render_plots_in_message(content)
+            history[i]["content"] = session["rendered_messages"][content]
+
+    return history
 
 css = """
     .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
@@ -357,20 +377,19 @@ def render_plots_in_message(message):
 
 
 async def respond(message, temp, tokens, prefill_text, system_prompt, history, session):
+
     if not message.strip():
         yield message, history
         return
+
     async for history in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
         for i, msg in enumerate(history):
             if msg.get("role") == "assistant":
                 content = msg["content"]
 
-                if content in session["rendered_messages"]:
-                    history[i]["content"] = session["rendered_messages"][content]
-                else:
-                    rendered = render_plots_in_message(content)
-                    session["rendered_messages"][content] = rendered
-                    history[i]["content"] = rendered
+                if content not in session["rendered_messages"]:
+                    session["rendered_messages"][content] = render_plots_in_message(content)
+                history[i]["content"] = session["rendered_messages"][content]
 
         yield "", history
 
@@ -381,6 +400,12 @@ def clear_history(session):
     session["user_messages"] = []
     session["assistant_messages"] = []
     return [], ""
+
+
+def strip_base64_images(content):
+    """Usuwa tagi <img> z base64 - dla starych, zepsutych wielkich yaml"""
+    import re
+    return re.sub(r'<img[^>]*>', '', content)
 
 
 def import_history_yaml(file_path):
@@ -409,7 +434,9 @@ def import_history_yaml(file_path):
                 session["assistant_messages"].append(conversation[i+1]["content"])
 
     for i in range(len(session["assistant_messages"])):
-        session["assistant_messages"][i] = render_plots_in_message(session["assistant_messages"][i])
+        session["assistant_messages"][i] = strip_base64_images(session["assistant_messages"][i])
+
+    session["rendered_messages"] = {}  # wyczyść cache, żeby wymusić re-rendering
 
     return session
 
@@ -550,7 +577,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         inputs=[file_input, import_confirm, session],
         outputs=[session]
     ).then(
-        lambda imported_session: (format_history(imported_session), ""),
+        lambda session: (format_history_with_rendering(session), ""),
         inputs=[session],
         outputs=[chatbot, msg]
     ).then(
