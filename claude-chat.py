@@ -515,8 +515,8 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
                 "the plots will be displayed automatically. Each such piece of code must be complete and working. "\
                 "Use sns.set_theme() instead of plt.style.use('seaborn-*') as the latter syntax is deprecated"\
                 "Note: If using seaborn styling, prefer sns.set_theme() over plt.style.use('seaborn-*') "\
-                "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches."\
-                "\n\nIMPORTANT:  Always use exactly this syntax for math:\n"\
+                "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches.\n\n"\
+                "IMPORTANT:  Always use exactly this syntax for math:\n"\
                 "- inline: \\$formula\\$\n"\
                 "- display: $$formula$$\n"\
                 "Never use single $ for inline math!\n"\
@@ -526,7 +526,8 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
                 "or simple expressions within text sentences\n"\
                 "2. Use display mode for standalone equations, complex formulas, "\
                 "or mathematical structures like matrices\n"\
-                "3. When explaining mathematical components, always use inline mode for each symbol",
+                "3. When explaining mathematical components, always use inline mode for each symbol\n\n"\
+                "Check your statements mentally but try to keep it short.",
             lines=12
         )
         prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", lines=2)
