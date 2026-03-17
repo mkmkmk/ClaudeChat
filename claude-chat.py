@@ -71,7 +71,6 @@ def load_env(file_path='.env'):
 
 env = load_env()
 api_key = env.get('MY_ANTHROPIC_API_KEY')
-client = anthropic.Client(api_key = api_key)
 
 
 def create_session():
@@ -121,6 +120,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
 
     for attempt in range(max_retries):
         try:
+            client = anthropic.Client(api_key = api_key)
             stream = client.messages.create(
                 model=MODEL_ID,
                 system=system_prompt if system_prompt.strip() else [],
@@ -382,16 +382,22 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
         yield message, history
         return
 
-    async for history in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
-        for i, msg in enumerate(history):
-            if msg.get("role") == "assistant":
-                content = msg["content"]
+    try:
+        async for history in chat_with_claude(message, temp, tokens, session, prefill_text, system_prompt):
+            for i, msg in enumerate(history):
+                if msg.get("role") == "assistant":
+                    content = msg["content"]
 
-                if content not in session["rendered_messages"]:
-                    session["rendered_messages"][content] = render_plots_in_message(content)
-                history[i]["content"] = session["rendered_messages"][content]
+                    if content not in session["rendered_messages"]:
+                        session["rendered_messages"][content] = render_plots_in_message(content)
+                    history[i]["content"] = session["rendered_messages"][content]
 
-        yield "", history
+            yield "", history
+
+    except Exception as e:
+            error_msg = f"⚠️ Connection error: {str(e)}\n\nYou can try sending the message again."
+            session["assistant_messages"].append(error_msg)
+            yield "", format_history(session)
 
 
 def clear_history(session):
