@@ -645,4 +645,4 @@ if __name__ == "__main__":
     if DEBUG:
         print("Debug mode enabled")
     iface.queue()
-    iface.launch(server_port=args.port, server_name="0.0.0.0")
+    iface.launch(server_port=args.port, server_name="0.0.0.0", show_error=True)
