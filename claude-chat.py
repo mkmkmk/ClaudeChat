@@ -34,6 +34,8 @@ PYTHON_START_LEN = len(PYTHON_START)
 PYTHON_END_LEN = len(PYTHON_END)
 MATPLOT_START = '%matplotlib inline'
 PY_COMP_START = '%py inline'
+AUTO_REPLY_START = "[Auto-reply]"
+AUTO_REPLY_END = "[Auto-reply end, avoid auto reply loops!]"
 
 if False:
     import sys
@@ -220,6 +222,8 @@ def format_history_with_rendering(session):
                 session["rendered_messages"][content] = render_plots_in_message(content)
             history[i]["content"] = session["rendered_messages"][content]
 
+    history = [msg for msg in history if not (msg.get("role") == "user" and AUTO_REPLY_START in msg.get("content", ""))]
+
     return history
 
 css = """
@@ -352,6 +356,7 @@ def render_plots_in_message(message):
                 error_message = f"\nError generating plot: '{str(e)}'\nProblematic code:\n{error_code}"
                 modified_message = modified_message[:code_end + PYTHON_END_LEN] + error_message + modified_message[code_end + PYTHON_END_LEN:]
                 print(error_message)
+
         start_idx = code_end + PYTHON_END_LEN
 
     return modified_message
@@ -409,6 +414,23 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
                                 session["rendered_messages"][content] = render_plots_in_message(content)
                             history[i]["content"] = session["rendered_messages"][content]
                     yield "", history
+
+                    if output and output.strip():
+                        session["rendered_messages"].clear()
+                        await asyncio.sleep(0.1)
+                        auto_msg = f"{AUTO_REPLY_START}\nOutput from code execution:\n```\n{output.strip()}\n```\n{AUTO_REPLY_END}"
+
+                        async for new_history in chat_with_claude(auto_msg, temp, tokens, session, prefill_text, system_prompt):
+                            for i, msg in enumerate(new_history):
+                                if msg.get("role") == "assistant":
+                                    content = msg["content"]
+                                    if content not in session["rendered_messages"]:
+                                        session["rendered_messages"][content] = render_plots_in_message(content)
+                                    new_history[i]["content"] = session["rendered_messages"][content]
+
+                            new_history = [msg for msg in new_history if not (msg.get("role") == "user" and AUTO_REPLY_START in msg.get("content", ""))]
+
+                            yield "", new_history
 
     except Exception as e:
             error_msg = f"⚠️ Connection error: {str(e)}\n\nYou can try sending the message again."
