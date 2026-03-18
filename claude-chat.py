@@ -284,25 +284,6 @@ css = """
 """
 
 
-def export_history(session):
-    if DEBUG:
-        print(f"Exporting history for session: {session['id']}")
-    
-    content = f"---- session: {session['id']}\n"
-    for user_msg, asst_msg in zip(session["user_messages"], session["assistant_messages"]):
-        content += f"\n----------------------\n##   User\n----------------------\n{user_msg}\n\n"
-        content += f"\n----------------------\n##   Assistant\n----------------------\n{asst_msg}\n\n"
-
-    current_time = datetime.now()
-    filename = f"chat_history_{current_time.strftime('%Y_%m_%d_%H_%M')}.md"
-    temp_dir = tempfile.gettempdir()
-    temp_path = os.path.join(temp_dir, filename)
-
-    with open(temp_path, 'w') as temp_file:
-        temp_file.write(content)
-
-    return temp_path
-
 def export_history_yaml(session):
     import yaml
 
@@ -453,10 +434,6 @@ def conditional_import(file_path, confirm, session):
     if not session["user_messages"] or confirm:
         return import_history_yaml(file_path)
     return session
-
-
-def update_button_state(history):
-    return gr.update(interactive=bool(history)), gr.update(interactive=bool(history))
 
 
 def auto_download():
