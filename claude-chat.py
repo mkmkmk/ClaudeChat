@@ -33,7 +33,7 @@ PYTHON_END = "```"
 PYTHON_START_LEN = len(PYTHON_START)
 PYTHON_END_LEN = len(PYTHON_END)
 MATPLOT_START = '%matplotlib inline'
-
+PY_COMP_START = '%py inline'
 
 if False:
     import sys
@@ -308,6 +308,7 @@ def export_history_yaml(session):
 
 def render_plots_in_message(message):
     """Renderuje wykresy w wiadomości zawierającej kod Python z matplotlib"""
+
     modified_message = message
     start_idx = 0
 
@@ -322,7 +323,7 @@ def render_plots_in_message(message):
             break
 
         code = modified_message[code_start:code_end].strip()
-        should_render_plot = '%matplotlib inline' in code and 'matplotlib' in code
+        should_render_plot = MATPLOT_START in code and 'matplotlib' in code
 
         if should_render_plot:
             try:
@@ -351,7 +352,6 @@ def render_plots_in_message(message):
                 error_message = f"\nError generating plot: '{str(e)}'\nProblematic code:\n{error_code}"
                 modified_message = modified_message[:code_end + PYTHON_END_LEN] + error_message + modified_message[code_end + PYTHON_END_LEN:]
                 print(error_message)
-
         start_idx = code_end + PYTHON_END_LEN
 
     return modified_message
@@ -374,6 +374,41 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
                     history[i]["content"] = session["rendered_messages"][content]
 
             yield "", history
+
+        if session["assistant_messages"] and PY_COMP_START in session["assistant_messages"][-1]:
+            last_msg = session["assistant_messages"][-1]
+            # Znajdź blok kodu
+            start = last_msg.find(PYTHON_START)
+            if start != -1:
+                code_start = start + PYTHON_START_LEN
+                code_end = last_msg.find(PYTHON_END, code_start)
+                if code_end != -1:
+                    code = last_msg[code_start:code_end].strip()
+                    code_lines = [line for line in code.split('\n') if line.strip() != PY_COMP_START]
+                    clean_code = '\n'.join(code_lines)
+
+                    # Wykonaj kod
+                    from io import StringIO
+                    import sys
+                    old_stdout = sys.stdout
+                    sys.stdout = captured = StringIO()
+                    try:
+                        exec(clean_code, {})
+                        output = captured.getvalue()
+                        if output and output != "(no output)":
+                            session["assistant_messages"][-1] += f"\n\n**Python Output:**\n```\n{output}\n```"
+                    finally:
+                        sys.stdout = old_stdout
+
+                    # Przerenderuj GUI
+                    history = format_history(session)
+                    for i, msg in enumerate(history):
+                        if msg.get("role") == "assistant":
+                            content = msg["content"]
+                            if content not in session["rendered_messages"]:
+                                session["rendered_messages"][content] = render_plots_in_message(content)
+                            history[i]["content"] = session["rendered_messages"][content]
+                    yield "", history
 
     except Exception as e:
             error_msg = f"⚠️ Connection error: {str(e)}\n\nYou can try sending the message again."
@@ -492,13 +527,24 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
             label="System Prompt",
             placeholder="Enter system prompt to define Claude's role",
             value=
-                "The chat environment supports the '%matplotlib inline' directive. "\
-                "Generate code or plots only when explicitly requested. When you do generate plots, always start with '%matplotlib inline' by default. "\
+                "The chat environment supports the '%matplotlib inline' directive for plots "\
+                "and '%py inline' for Python computations with output display. "\
+                "Generate code or plots only when explicitly requested. "\
+                "When you do generate plots, always start with '%matplotlib inline' by default. "\
                 "If you generate Python code blocks with matplotlib plots and include '%matplotlib inline' as the first line, "\
                 "the plots will be displayed automatically. Each such piece of code must be complete and working. "\
                 "Use sns.set_theme() instead of plt.style.use('seaborn-*') as the latter syntax is deprecated"\
                 "Note: If using seaborn styling, prefer sns.set_theme() over plt.style.use('seaborn-*') "\
-                "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches.\n\n"\
+                "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches."\
+                "\n\nFor computations (not plots), use '%py inline' as the first line. "\
+                "The output will be captured and displayed automatically.\n\n"\
+                "IMPORTANT for '%py inline' blocks:\n"\
+                "- Code executes automatically AFTER you finish your response\n"\
+                "- NEVER predict, simulate, or write the output yourself\n"\
+                "- STOP after the code block - don't add predicted results\n"\
+                "- Wait for actual execution results to appear in the interface\n"\
+                "- You can analyze/comment on real output in your NEXT response (when user asks)\n"\
+                "- Auto-reply loops are PROHIBITED - single code block then WAIT for user\n\n"\
                 "IMPORTANT:  Always use exactly this syntax for math:\n"\
                 "- inline: \\$formula\\$\n"\
                 "- display: $$formula$$\n"\
