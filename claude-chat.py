@@ -533,6 +533,14 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         send = gr.Button("Send", elem_classes=["orange-button", "custom-button"], elem_id="send-button", variant="primary", scale=0)
 
     with gr.Row():
+        reactions = ["🙂", "😀", "😄", "😊", "😂", "🤣", "😅", "😮", "😢", "😙", "😘", "😜", "😟", "🙁", "🤔", "🤨", "😱", "👍", "👎", "👏", "🙏", "🚀", "🎯", "🎉", "🌶️", '✨', '🔥', "✅", "❌", "⚠️", "💡"]
+
+        for emoji in reactions:
+            btn = gr.Button(emoji, size="sm", min_width=30, scale=0)
+            btn.click(lambda emoji, current_msg: current_msg + " " + emoji,
+                    [gr.State(emoji), msg], msg)
+
+    with gr.Row():
         delete_last = gr.Button("⬅️ Delete Last")
         clear = gr.Button("🗑️  Clear")
         export = gr.Button("Export history")
