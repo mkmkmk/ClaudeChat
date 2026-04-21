@@ -10,6 +10,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import io
 import base64
+import sys
+import logging
 
 # pip install gradio==5.20.0
 # pip install matplotlib-style-packages
@@ -37,20 +39,16 @@ PY_COMP_START = '%py inline'
 AUTO_REPLY_START = "[Auto-reply]"
 AUTO_REPLY_END = "[Auto-reply end, avoid auto reply loops!]"
 
-if False:
-    import sys
-    import logging
-
-    logging.basicConfig(
-        # filename='/var/log/claude-chat-debug.log',
-        filename='claude-chat-debug.log',
-        level=logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    logging.debug(f"Python version: {sys.version}")
-    logging.debug(f"Current working directory: {os.getcwd()}")
-    logging.debug(f"Environment variables: {dict(os.environ)}")
-    logging.debug(f"Script path: {__file__}")
+logging.basicConfig(
+    # filename='/var/log/claude-chat-debug.log',
+    filename='claude-chat-debug.log',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logging.debug(f"Python version: {sys.version}")
+logging.debug(f"Current working directory: {os.getcwd()}")
+logging.debug(f"Environment variables: {dict(os.environ)}")
+logging.debug(f"Script path: {__file__}")
 
 
 def parse_arguments():
@@ -290,6 +288,18 @@ css = """
 
 def export_history_yaml(session):
     import yaml
+    import sys
+
+    logging.debug(f"DEBUG export: type={type(session)}")
+
+
+    if not session or not isinstance(session, dict):
+        logging.debug(f"ERROR: Invalid session type")
+        return None
+
+    if "id" not in session:
+        logging.debug(f"ERROR: Session missing 'id' key")
+        return None
 
     data = {
         "session_id": session["id"],
@@ -506,7 +516,7 @@ def delete_last_message(session):
 
 
 with gr.Blocks(css=css, title="ClaudeChat") as iface:
-    session = gr.State(create_session)
+    session = gr.State(create_session())
 
     gr.Markdown("## <center>ClaudeChat</center>")
     gr.Markdown("### <center>Python + Gradio + Anthropic API</center>")
@@ -533,7 +543,7 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
         send = gr.Button("Send", elem_classes=["orange-button", "custom-button"], elem_id="send-button", variant="primary", scale=0)
 
     with gr.Row():
-        reactions = ["🙂", "😀", "😊", "😂", "🤣", "😅", "😮", "😢", "😙", "😜", "😟", "🙁", "🤔", "🤨", "😱", "👍", "👎", "👏", "🙏", "🚀", "🎯", "🎉", '✨', '🔥', "⚠️", "💡"]
+        reactions = ["👍", "👎", "👏", "🙏", "🙂", "😀", "😊", "😂", "🤣", "😅", "😮", "😢", "😙", "😜", "😟", "🙁", "🤔", "🤨", "😱", "🚀", "🎯", "🎉", '✨', '🔥', "⚠️", "💡"]
 
         for emoji in reactions:
             btn = gr.Button(emoji, size="sm", min_width=30, scale=0)
