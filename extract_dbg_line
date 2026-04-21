@@ -1,0 +1,9 @@
+#!/bin/bash
+if [ -z "$1" ]; then
+    echo "Error:   Parameter required"
+    echo "Usage:   $0 <search_pattern>"
+    echo "Example: $0 \"2026-02-19 11:12:51,335\""
+    exit 1
+fi
+grep "^$1" /var/log/claude-chat-debug.log > ../dbglog-XX.txt
+echo "../dbglog-XX.txt created"
