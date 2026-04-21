@@ -8,27 +8,31 @@ import sys
 import argparse
 
 def parse_conversation_log(log_text):
-    # pair role-content
-    pattern = r"\{'role': '(user|assistant)', 'content': '(.*?)'\}"
-    matches = re.findall(pattern, log_text, re.DOTALL)
+    # Znajdź sekcję 'messages': [...]
+    messages_match = re.search(r"'messages':\s*(\[.*?\])\s*,\s*'model':", log_text, re.DOTALL)
 
-    if not matches:
-        return {"error": "Nie znaleziono wiadomości w logu"}
+    if not messages_match:
+        return {"error": "Nie znaleziono sekcji 'messages' w logu"}
 
+    messages_str = messages_match.group(1)
+
+    # Parsuj jako Python literal
+    try:
+        messages_list = ast.literal_eval(messages_str)
+    except:
+        return {"error": "Błąd parsowania listy wiadomości"}
+
+    # Przetwórz wiadomości
     messages = []
-    for role, content in matches:
-
-        content = content.replace('\\n', '\n')
-        content = content.replace("\\'", "'")
-        content = content.replace('\\\\', '\\')
-
-        messages.append({
-            "role": role,
-            "content": content
-        })
+    for msg in messages_list:
+        if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
+            messages.append({
+                "role": msg['role'],
+                "content": msg['content']
+            })
 
     yaml_data = {
-        "session_id": str(uuid.uuid4()),  # new random UUID
+        "session_id": str(uuid.uuid4()),
         "conversation": messages
     }
 
@@ -42,8 +46,8 @@ def log_to_yaml(log_text, output_file=None):
 def main():
     parser = argparse.ArgumentParser(description='Converts the conversation log to YAML format')
     parser.add_argument('input_file', help='Path to the input log file')
-    parser.add_argument('-o', '--output', default='output.yaml',
-                       help='Path to output file (default: output.yaml)')
+    #parser.add_argument('-o', '--output', default='output.yaml',
+    #                   help='Path to output file (default: output.yaml)')
 
     args = parser.parse_args()
 
@@ -53,10 +57,12 @@ def main():
 
         yaml_output = log_to_yaml(log_text)
 
-        with open(args.output, 'w', encoding='utf-8') as file:
+        out_file = args.input_file + ".yaml"
+
+        with open(out_file, 'w', encoding='utf-8') as file:
             file.write(yaml_output)
 
-        print(f"Conversion completed successfully. Result saved in: {args.output}")
+        print(f"Conversion completed successfully. Result saved in: {out_file}")
 
     except FileNotFoundError:
         print(f"Error: Cannot find file '{args.input_file}'", file=sys.stderr)
