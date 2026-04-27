@@ -13,8 +13,9 @@ import base64
 import sys
 import logging
 
-# pip install gradio==5.20.0
+# pip install gradio==5.49.1
 # pip install matplotlib-style-packages
+# pip install seaborn
 
 DEBUG = False
 
