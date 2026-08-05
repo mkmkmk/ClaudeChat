@@ -12,12 +12,16 @@ import io
 import base64
 import sys
 import logging
+import warnings
 
 # pip install gradio==5.49.1
 # pip install matplotlib-style-packages
 # pip install seaborn
 
 DEBUG = False
+
+# https://platform.claude.com/docs/en/about-claude/model-deprecations#model-status
+# https://claude.com/pricing#api
 
 # MODEL_ID = "claude-3-5-sonnet-20241022",
 # MODEL_TITLE = "Sonnet 3.5"
@@ -28,8 +32,12 @@ DEBUG = False
 # MODEL_ID = "claude-4-sonnet-20250514"
 # MODEL_TITLE = "Sonnet 4"
 
-MODEL_ID = "claude-sonnet-4-5-20250929"
-MODEL_TITLE = "Sonnet 4.5"
+# MODEL_ID = "claude-sonnet-4-5-20250929"
+# MODEL_TITLE = "Sonnet 4.5"
+
+MODEL_ID = "claude-sonnet-5"
+MODEL_TITLE = "Sonnet 5"
+
 
 PYTHON_START = "```python"
 PYTHON_END = "```"
@@ -126,7 +134,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                 model=MODEL_ID,
                 system=system_prompt if system_prompt.strip() else [],
                 max_tokens=max_tokens,
-                temperature=temperature,
+                # temperature=temperature,
                 messages=msg_ap,
                 stream=True
             )
@@ -568,6 +576,8 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
             label="System Prompt",
             placeholder="Enter system prompt to define Claude's role",
             value=
+                "Always wrap all code in a fenced code block that starts with exactly '```python' "\
+                "on its own line, immediately followed by '%matplotlib inline' or '%py inline' as the very next line. "\
                 "The chat environment supports the '%matplotlib inline' directive for plots "\
                 "and '%py inline' for Python computations with output display. "\
                 "Generate code or plots only when explicitly requested. "\
@@ -659,6 +669,8 @@ with gr.Blocks(css=css, title="ClaudeChat") as iface:
 
 
 if __name__ == "__main__":
+    warnings.filterwarnings('ignore', message='Glyph.*missing from font')
+
     args = parse_arguments()
     DEBUG = args.debug
     if DEBUG:
