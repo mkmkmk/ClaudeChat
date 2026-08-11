@@ -112,12 +112,28 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
         # double check - bez img bo kasa poleci
         cleaned_asst_msg = strip_base64_images(asst_msg)
         messages.append({"role": "assistant", "content": cleaned_asst_msg})
-    messages.append({"role": "user", "content": message})
 
     if DEBUG:
         for i, (orig, msg) in enumerate(zip(session["assistant_messages"], messages[1::2])):
             if len(orig) != len(msg["content"]):
                 print(f"⚠️  WARNING: Cleaned {len(orig) - len(msg['content'])} chars from message {i}")
+
+    # --- PROMPT CACHING: marks the end of the current story as a cache breakpoint
+    if messages:
+        last = messages[-1]
+        messages[-1] = {
+            "role": last["role"],
+            "content": [
+                {
+                    "type": "text",
+                    "text": last["content"],
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ]
+        }
+    # ---
+
+    messages.append({"role": "user", "content": message})
 
     msg_ap = messages.copy()
     prefill_text = prefill_text.rstrip()
@@ -127,12 +143,24 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     max_retries = 3
     retry_delay = 1  # seconds
 
+    # --- cache system prompt
+    system_param = []
+    if system_prompt.strip():
+        system_param = [
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"}
+            }
+        ]
+    # ---
+
     for attempt in range(max_retries):
         try:
             client = anthropic.Client(api_key = api_key)
             stream = client.messages.create(
                 model=MODEL_ID,
-                system=system_prompt if system_prompt.strip() else [],
+                system=system_param,
                 max_tokens=max_tokens,
                 # temperature=temperature,
                 messages=msg_ap,
@@ -168,6 +196,18 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                                 assistant_message += content.text
 
                 elif hasattr(chunk, 'message'):
+
+                    # --- DEBUG: cache stats
+                    if DEBUG and hasattr(chunk.message, 'usage'):
+                        u = chunk.message.usage
+                        cache_created = getattr(u, 'cache_creation_input_tokens', 0)
+                        cache_read = getattr(u, 'cache_read_input_tokens', 0)
+                        input_tokens = getattr(u, 'input_tokens', 0)
+                        print(f"📊 CACHE STATS | input: {input_tokens} | "
+                              f"cache_created: {cache_created} | "
+                              f"cache_read: {cache_read}")
+                    # ---
+
                     if hasattr(chunk.message, 'content'):
                         for content in chunk.message.content:
                             if content.type == 'text':
@@ -177,6 +217,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                 yield format_history(session, assistant_message)
 
             if assistant_message:
+                # print(repr(assistant_message[:500]))
                 session["assistant_messages"].append(assistant_message)
                 yield format_history(session)
                 break
@@ -674,6 +715,6 @@ if __name__ == "__main__":
     args = parse_arguments()
     DEBUG = args.debug
     if DEBUG:
-        print("Debug mode enabled")
+        print("DEBUG == True\n")
     iface.queue()
     iface.launch(server_port=args.port, server_name="0.0.0.0", show_error=True)
