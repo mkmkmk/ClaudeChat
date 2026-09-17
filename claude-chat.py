@@ -7,6 +7,8 @@ import argparse
 import uuid
 import tempfile
 from datetime import datetime
+import matplotlib
+matplotlib.use('Agg')   # <-- MUSI być przed "import matplotlib.pyplot as plt"
 import matplotlib.pyplot as plt
 import io
 import base64
@@ -93,12 +95,25 @@ def create_session():
     }
     if DEBUG:
         print(f"New session created: {session_id}")
+        logging.info(f"New session created: {session_id}")
     return session
 
 
 async def chat_with_claude(message, temperature, max_tokens, session, prefill_text, system_prompt):
+    try:
+        async for result in chat_with_claude_body(message, temperature, max_tokens, session, prefill_text, system_prompt):
+            yield result
+    except Exception as e:
+        error_message = f"An error occurred: {str(e)}"
+        session["assistant_messages"].append(error_message)
+        print(f"chat_with_claude() exception: {str(e)}")
+        logging.error(f"chat_with_claude() exception: {str(e)}")
+        yield format_history(session)
+
+
+async def chat_with_claude_body(message, temperature, max_tokens, session, prefill_text, system_prompt):
     if DEBUG:
-        print(f"{session['id']}: {message}")
+        logging.debug(f"{session['id']}: {message}")
 
     # if not message.strip():
     #     yield []
@@ -116,7 +131,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     if DEBUG:
         for i, (orig, msg) in enumerate(zip(session["assistant_messages"], messages[1::2])):
             if len(orig) != len(msg["content"]):
-                print(f"⚠️  WARNING: Cleaned {len(orig) - len(msg['content'])} chars from message {i}")
+                logging.warning(f"⚠️  WARNING: Cleaned {len(orig) - len(msg['content'])} chars from message {i}")
 
     # --- PROMPT CACHING: marks the end of the current story as a cache breakpoint
     if messages:
@@ -156,6 +171,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
     # ---
 
     for attempt in range(max_retries):
+        should_retry = False
         try:
             client = anthropic.Client(api_key = api_key)
             stream = client.messages.create(
@@ -175,11 +191,20 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                 if session["stop_generation"]:
                     break
 
+                if getattr(chunk, 'type', None) == 'message_delta':
+                        sr = getattr(chunk.delta, 'stop_reason', None)
+                        if sr:
+                            stop_reason = sr
+                            logging.debug(f"stop_reason received: {sr}")
+                            print(f"stop_reason received: {sr}")
+
                 if hasattr(chunk, 'error') and chunk.error.get('type') == 'overloaded_error':
                     if attempt < max_retries - 1:
                         wait_time = retry_delay * (2 ** attempt)
                         print(f"Overloaded error, waiting {wait_time} seconds before retry...")
+                        logging.error(f"Overloaded error, waiting {wait_time} seconds before retry...")
                         await asyncio.sleep(wait_time)
+                        should_retry = True
                         break
                     else:
                         error_message = "Server is currently overloaded. Please try again later."
@@ -196,14 +221,13 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                                 assistant_message += content.text
 
                 elif hasattr(chunk, 'message'):
-
                     # --- DEBUG: cache stats
                     if DEBUG and hasattr(chunk.message, 'usage'):
                         u = chunk.message.usage
                         cache_created = getattr(u, 'cache_creation_input_tokens', 0)
                         cache_read = getattr(u, 'cache_read_input_tokens', 0)
                         input_tokens = getattr(u, 'input_tokens', 0)
-                        print(f"📊 CACHE STATS | input: {input_tokens} | "
+                        logging.debug(f"📊 CACHE STATS | input: {input_tokens} | "
                               f"cache_created: {cache_created} | "
                               f"cache_read: {cache_read}")
                     # ---
@@ -216,16 +240,26 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
                 await asyncio.sleep(0)
                 yield format_history(session, assistant_message)
 
+            if should_retry:
+                continue
+
             if assistant_message:
-                # print(repr(assistant_message[:500]))
                 session["assistant_messages"].append(assistant_message)
+                yield format_history(session)
+                break
+
+            if not assistant_message:
+                logging.warning(f"Empty assistant_message! stop_reason={stop_reason}")
+                print(f"Empty assistant_message! stop_reason={stop_reason}")
+                fallback = f"⚠️ Model zwrócił pustą odpowiedź (stop_reason: {stop_reason})."
+                session["assistant_messages"].append(fallback)
                 yield format_history(session)
                 break
 
         except Exception as e:
             if attempt < max_retries - 1:
                 wait_time = retry_delay * (2 ** attempt)
-                print(f"Error occurred: {str(e)}, waiting {wait_time} seconds before retry...")
+                logging.error(f"Error occurred: {str(e)}, waiting {wait_time} seconds before retry...")
                 await asyncio.sleep(wait_time)
                 continue
             else:
@@ -239,7 +273,7 @@ async def chat_with_claude(message, temperature, max_tokens, session, prefill_te
 
 def stop_generation_func(session):
     if DEBUG:
-        print(f"Stop generation called for session: {session['id']}")
+        logging.debug(f"Stop generation called for session: {session['id']}")
     session["stop_generation"] = True
 
 
@@ -340,15 +374,15 @@ def export_history_yaml(session):
     import yaml
     import sys
 
-    logging.debug(f"DEBUG export: type={type(session)}")
+    logging.debug(f"export: type={type(session)}")
 
 
     if not session or not isinstance(session, dict):
-        logging.debug(f"ERROR: Invalid session type")
+        logging.error(f"Invalid session type")
         return None
 
     if "id" not in session:
-        logging.debug(f"ERROR: Session missing 'id' key")
+        logging.error(f"Session missing 'id' key")
         return None
 
     data = {
@@ -399,7 +433,13 @@ def render_plots_in_message(message):
                             if not line.strip() == MATPLOT_START
                             and not 'plt.show()' in line]
 
+                print(f"before exec, code:\n{code}")
+                logging.debug(f"before exec, code:\n{code}")
+
                 exec('\n'.join(code_lines), namespace)
+
+                print("after exec")
+                logging.debug("after exec")
 
                 buf = io.BytesIO()
                 plt.savefig(buf, format='png', dpi=120, bbox_inches='tight')
@@ -415,7 +455,7 @@ def render_plots_in_message(message):
                 error_code = '\n'.join(error_lines)
                 error_message = f"\nError generating plot: '{str(e)}'\nProblematic code:\n{error_code}"
                 modified_message = modified_message[:code_end + PYTHON_END_LEN] + error_message + modified_message[code_end + PYTHON_END_LEN:]
-                print(error_message)
+                logging.error(error_message)
 
         start_idx = code_end + PYTHON_END_LEN
 
@@ -494,6 +534,7 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
 
     except Exception as e:
             error_msg = f"⚠️ Connection error: {str(e)}\n\nYou can try sending the message again."
+            logging.error(logging.error)
             session["assistant_messages"].append(error_msg)
             yield "", format_history(session)
 
@@ -501,6 +542,7 @@ async def respond(message, temp, tokens, prefill_text, system_prompt, history, s
 def clear_history(session):
     if DEBUG:
         print(f"Clearing history for session: {session['id']}")
+        logging.debug(f"Clearing history for session: {session['id']}")
     session["user_messages"] = []
     session["assistant_messages"] = []
     return [], ""
@@ -509,7 +551,20 @@ def clear_history(session):
 def strip_base64_images(content):
     """Usuwa tagi <img> z base64 - dla starych, zepsutych wielkich yaml"""
     import re
+    if not isinstance(content, str):
+        if isinstance(content, list):
+            content = "".join(b.get("text", "") for b in content if isinstance(b, dict))
+        else:
+            content = str(content)
     return re.sub(r'<img[^>]*>', '', content)
+
+
+def normalize_content(content):
+    if isinstance(content, list):
+        return "".join(b.get("text", "") for b in content if isinstance(b, dict))
+    if isinstance(content, dict):
+        return content.get("text", "")
+    return content
 
 
 def import_history_yaml(file_path):
@@ -534,8 +589,8 @@ def import_history_yaml(file_path):
     for i in range(0, len(conversation), 2):
         if i+1 < len(conversation):
             if conversation[i]["role"] == "user" and conversation[i+1]["role"] == "assistant":
-                session["user_messages"].append(conversation[i]["content"])
-                session["assistant_messages"].append(conversation[i+1]["content"])
+                session["user_messages"].append(normalize_content(conversation[i]["content"]))
+                session["assistant_messages"].append(normalize_content(conversation[i+1]["content"]))
 
     for i in range(len(session["assistant_messages"])):
         session["assistant_messages"][i] = strip_base64_images(session["assistant_messages"][i])
