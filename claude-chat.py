@@ -8,7 +8,7 @@ import uuid
 import tempfile
 from datetime import datetime
 import matplotlib
-matplotlib.use('Agg')   # <-- MUSI być przed "import matplotlib.pyplot as plt"
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
 import base64
