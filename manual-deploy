@@ -1,5 +1,6 @@
 #!/bin/bash
 sudo meld claude-chat.py /usr/local/bin/claude-chat.py
+sudo meld prompt.txt /etc/claude-chat/prompt.txt
 sudo systemctl daemon-reload
 sudo systemctl restart claude-chat.service
 

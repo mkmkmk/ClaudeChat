@@ -81,9 +81,10 @@ def load_env(file_path='.env'):
     return env_vars
 
 env = load_env()
-api_key = env.get('MY_ANTHROPIC_API_KEY')
-css_path = "style.css"
+css_path = 'style.css'
+prompt_path = 'prompt.txt'
 
+api_key = env.get('MY_ANTHROPIC_API_KEY')
 
 def create_session():
     session_id = str(uuid.uuid4())
@@ -608,46 +609,13 @@ with gr.Blocks(css=css_content, title="ClaudeChat") as iface:
     file_output = gr.File(label="Exported Chat History", visible=False)
     file_input = gr.File(label="Import Chat History", visible=False, file_types=[".yaml"])
 
+    prompt_content = Path(prompt_path).read_text(encoding="utf-8")
+
     with gr.Accordion("Parameters", open=False):
         system_prompt = gr.Textbox(
             label="System Prompt",
             placeholder="Enter system prompt to define Claude's role",
-            value=
-                "Always wrap all code in a fenced code block that starts with exactly '```python' "\
-                "on its own line, immediately followed by '%matplotlib inline' or '%py inline' as the very next line. "\
-                "The chat environment supports the '%matplotlib inline' directive for plots "\
-                "and '%py inline' for Python computations with output display. "\
-                "Generate code or plots only when explicitly requested. "\
-                "Never use '%py inline' or '%matplotlib inline' blocks for shell/terminal/bash commands "\
-                "(apt, sudo, lualatex, df, ls, etc.) — only for actual Python code meant to run in this chat. "\
-                "Shell commands go in plain '```bash' blocks, never executed, never simulated with print(). "\
-                "When you do generate plots, always start with '%matplotlib inline' by default. "\
-                "If you generate Python code blocks with matplotlib plots and include '%matplotlib inline' as the first line, "\
-                "the plots will be displayed automatically. Each such piece of code must be complete and working. "\
-                "Use sns.set_theme() instead of plt.style.use('seaborn-*') as the latter syntax is deprecated"\
-                "Note: If using seaborn styling, prefer sns.set_theme() over plt.style.use('seaborn-*') "\
-                "as the latter syntax is deprecated. However, you're free to use any matplotlib styles or custom styling approaches."\
-                "\n\nFor computations (not plots), use '%py inline' as the first line. "\
-                "The output will be captured and displayed automatically.\n\n"\
-                "IMPORTANT for '%py inline' blocks:\n"\
-                "- Code executes automatically AFTER you finish your response\n"\
-                "- NEVER predict, simulate, or write the output yourself\n"\
-                "- STOP after the code block - don't add predicted results\n"\
-                "- Wait for actual execution results to appear in the interface\n"\
-                "- You can analyze/comment on real output in your NEXT response (when user asks)\n"\
-                "- Auto-reply loops are PROHIBITED - single code block then WAIT for user\n\n"\
-                "IMPORTANT:  Always use exactly this syntax for math:\n"\
-                "- inline: \\$formula\\$\n"\
-                "- display: $$formula$$\n"\
-                "Never use single $ for inline math!\n"\
-                "Do not interpret these markers - show them exactly as written. Use the standard LaTeX syntax inside the delimiters.\n\n"\
-                "Always follow these rules:\n"\
-                "1. Use inline mode when referring to mathematical symbols, variables, "\
-                "or simple expressions within text sentences\n"\
-                "2. Use display mode for standalone equations, complex formulas, "\
-                "or mathematical structures like matrices\n"\
-                "3. When explaining mathematical components, always use inline mode for each symbol\n\n"\
-                "Check your statements mentally but try to keep it short.",
+            value=prompt_content,
             lines=12
         )
         prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", lines=2)

@@ -8,6 +8,7 @@ SCRIPT_PATH="/usr/local/bin/claude-chat.py"
 ENV_DIR="/etc/claude-chat"
 ENV_FILE="$ENV_DIR/.env"
 STYLE_FILE="$ENV_DIR/style.css"
+PROMPT_FILE="$ENV_DIR/prompt.txt"
 SERVICE_FILE="/etc/systemd/system/claude-chat.service"
 LOCAL_SERVICE_FILE="claude-chat.service"  # Plik w lokalnym repozytorium
 
@@ -23,6 +24,7 @@ sudo cp .env "$ENV_FILE"
 sudo chown $CURRENT_USER:$CURRENT_USER "$ENV_FILE"
 sudo chmod 600 "$ENV_FILE"
 sudo cp style.css "$STYLE_FILE"
+sudo cp prompt.txt "$PROMPT_FILE"
 
 # Aktualizacja ścieżki do .env w pliku Python
 sudo sed -i "s|def load_env(file_path='.env'):|def load_env(file_path='$ENV_FILE'):|" "$SCRIPT_PATH"
