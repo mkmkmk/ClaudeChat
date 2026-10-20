@@ -15,6 +15,7 @@ import base64
 import sys
 import logging
 import warnings
+from pathlib import Path
 
 # pip install gradio==5.49.1
 # pip install matplotlib-style-packages
@@ -79,9 +80,9 @@ def load_env(file_path='.env'):
                 env_vars[key.strip()] = value.strip()
     return env_vars
 
-
 env = load_env()
 api_key = env.get('MY_ANTHROPIC_API_KEY')
+css_path = "style.css"
 
 
 def create_session():
@@ -307,67 +308,6 @@ def format_history_with_rendering(session):
     history = [msg for msg in history if not (msg.get("role") == "user" and AUTO_REPLY_START in msg.get("content", ""))]
 
     return history
-
-css = """
-    .chat-message { padding: 10px; margin-bottom: 10px; border-radius: 15px; }
-    .user-message { background-color: #DCF8C6 !important; margin-left: 40%; }
-    .bot-message { background-color: #E0E0E0 !important; margin-right: 40%; }
-    .chat-container { height: 400px; overflow-y: auto; }
-    #send-button,
-    button#send-button,
-    .orange-button#send-button,
-    div[id^='component-'] #send-button {
-        background-color: orange !important; 
-        background: orange !important;
-        color: white !important;
-    }
-    button.primary:not(#send-button) {
-        background-color: #2196F3 !important;
-        color: white !important;
-        border: none !important;
-        padding: 10px 20px !important;
-        text-align: center !important;
-        text-decoration: none !important;
-        display: inline-block !important;
-        font-size: 16px !important;
-        margin: 4px 2px !important;
-        cursor: pointer !important;
-        transition: 0.3s !important;
-    }
-    button.primary:not(#send-button):hover {
-        background-color: #0b7dda !important;
-    }
-    button.primary:not(#send-button):disabled {
-        background-color: #cccccc !important;
-        color: #666666 !important;
-        cursor: not-allowed !important;
-    }
-    .footer {
-        background-color: initial !important;
-        color: initial !important;
-    }
-    body, .gradio-container {
-        margin: 0;
-        padding: 0;
-        min-height: 100vh;
-        width: 100vw;
-        overflow-y: auto;
-    }
-    .gradio-container {
-        display: flex;
-        flex-direction: column;
-    }
-    .chat-container {
-        flex-grow: 1;
-        min-height: 60vh;
-        overflow-y: auto;
-    }
-    #component-0 {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-"""
 
 
 def export_history_yaml(session):
@@ -619,8 +559,9 @@ def delete_last_message(session):
         session["assistant_messages"].pop()
     return format_history(session)
 
+css_content = Path(css_path).read_text(encoding="utf-8")
 
-with gr.Blocks(css=css, title="ClaudeChat") as iface:
+with gr.Blocks(css=css_content, title="ClaudeChat") as iface:
     session = gr.State(create_session())
 
     gr.Markdown("## <center>ClaudeChat</center>")
