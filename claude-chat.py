@@ -623,7 +623,7 @@ with gr.Blocks(css=css_content, title="ClaudeChat") as iface:
         )
         prefill = gr.Textbox(label="Prefill Text", placeholder="Enter text to prefill Claude's response", lines=2)
         temperature = gr.Slider(minimum=0, maximum=1, value=0, step=0.1, label="Temperature")
-        max_tokens = gr.Slider(minimum=1000, maximum=8000, value=4000, step=500, label="Maximum number of tokens")
+        max_tokens = gr.Slider(minimum=1000, maximum=64000, value=16000, step=500, label="Maximum number of tokens")
 
     msg.submit(respond, [msg, temperature, max_tokens, prefill, system_prompt, chatbot, session], [msg, chatbot])
     # .then( update_button_state, [chatbot], [clear, export] )
