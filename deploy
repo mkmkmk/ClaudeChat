@@ -27,7 +27,10 @@ sudo cp style.css "$STYLE_FILE"
 sudo cp prompt.txt "$PROMPT_FILE"
 
 # Aktualizacja ścieżki do .env w pliku Python
-sudo sed -i "s|def load_env(file_path='.env'):|def load_env(file_path='$ENV_FILE'):|" "$SCRIPT_PATH"
+sudo sed -i \
+  -e "s|^DEBUG_LOG_DIR = '.'$|DEBUG_LOG_DIR = '/var/log'|" \
+  -e "s|^ENV_DIR = '.'$|ENV_DIR = '/etc/claude-chat'|" \
+  "$SCRIPT_PATH"
 
 # Kopiowanie i dostosowywanie pliku usługi systemd
 sudo cp "$LOCAL_SERVICE_FILE" "$SERVICE_FILE"

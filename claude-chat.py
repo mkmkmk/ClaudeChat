@@ -41,7 +41,6 @@ DEBUG = False
 MODEL_ID = "claude-sonnet-5"
 MODEL_TITLE = "Sonnet 5"
 
-
 PYTHON_START = "```python"
 PYTHON_END = "```"
 PYTHON_START_LEN = len(PYTHON_START)
@@ -51,9 +50,16 @@ PY_COMP_START = '%py inline'
 AUTO_REPLY_START = "[Auto-reply]"
 AUTO_REPLY_END = "[Auto-reply end, avoid auto reply loops!]"
 
+DEBUG_LOG_DIR = '.'
+ENV_DIR = '.'
+
+DEBUG_LOG_PATH=f'{DEBUG_LOG_DIR}/claude-chat-debug.log'
+ENV_PATH = f'{ENV_DIR}/.env'
+CSS_PATH = f'{ENV_DIR}/style.css'
+PROMPT_PATH = f'{ENV_DIR}/prompt.txt'
+
 logging.basicConfig(
-    # filename='/var/log/claude-chat-debug.log',
-    filename='claude-chat-debug.log',
+    filename=DEBUG_LOG_PATH,
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
@@ -70,7 +76,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def load_env(file_path='.env'):
+def load_env(file_path):
     env_vars = {}
     with open(file_path, 'r') as file:
         for line in file:
@@ -80,10 +86,7 @@ def load_env(file_path='.env'):
                 env_vars[key.strip()] = value.strip()
     return env_vars
 
-env = load_env()
-css_path = 'style.css'
-prompt_path = 'prompt.txt'
-
+env = load_env(ENV_PATH)
 api_key = env.get('MY_ANTHROPIC_API_KEY')
 
 def create_session():
@@ -560,7 +563,7 @@ def delete_last_message(session):
         session["assistant_messages"].pop()
     return format_history(session)
 
-css_content = Path(css_path).read_text(encoding="utf-8")
+css_content = Path(CSS_PATH).read_text(encoding="utf-8")
 
 with gr.Blocks(css=css_content, title="ClaudeChat") as iface:
     session = gr.State(create_session())
@@ -609,7 +612,7 @@ with gr.Blocks(css=css_content, title="ClaudeChat") as iface:
     file_output = gr.File(label="Exported Chat History", visible=False)
     file_input = gr.File(label="Import Chat History", visible=False, file_types=[".yaml"])
 
-    prompt_content = Path(prompt_path).read_text(encoding="utf-8")
+    prompt_content = Path(PROMPT_PATH).read_text(encoding="utf-8")
 
     with gr.Accordion("Parameters", open=False):
         system_prompt = gr.Textbox(
