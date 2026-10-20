@@ -578,7 +578,7 @@ with gr.Blocks(css=css_content, title="ClaudeChat") as iface:
         # bubble_full_width=False,
         latex_delimiters=[
             {"left": "$$", "right": "$$", "display": True},      # display mode z $$
-            {"left": "\\$", "right": "\\$", "display": False},   # inline mode z \$
+            {"left": "$", "right": "$", "display": False},       # inline mode $
             {"left": "\\[", "right": "\\]", "display": True},    # LaTeX display mode
             {"left": "\\(", "right": "\\)", "display": False}    # LaTeX inline mode
         ]

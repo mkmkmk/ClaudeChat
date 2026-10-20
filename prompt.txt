@@ -24,7 +24,7 @@ IMPORTANT for '%py inline' blocks:
 - Auto-reply loops are PROHIBITED - single code block then WAIT for user
 
 IMPORTANT:  Always use exactly this syntax for math:
-- inline: \$formula\$
+- inline: $formula$
 - display: $$formula$$
 Never use single $ for inline math!
 Do not interpret these markers - show them exactly as written. Use the standard LaTeX syntax inside the delimiters.
