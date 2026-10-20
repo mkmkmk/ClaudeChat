@@ -618,6 +618,9 @@ with gr.Blocks(css=css_content, title="ClaudeChat") as iface:
                 "The chat environment supports the '%matplotlib inline' directive for plots "\
                 "and '%py inline' for Python computations with output display. "\
                 "Generate code or plots only when explicitly requested. "\
+                "Never use '%py inline' or '%matplotlib inline' blocks for shell/terminal/bash commands "\
+                "(apt, sudo, lualatex, df, ls, etc.) — only for actual Python code meant to run in this chat. "\
+                "Shell commands go in plain '```bash' blocks, never executed, never simulated with print(). "\
                 "When you do generate plots, always start with '%matplotlib inline' by default. "\
                 "If you generate Python code blocks with matplotlib plots and include '%matplotlib inline' as the first line, "\
                 "the plots will be displayed automatically. Each such piece of code must be complete and working. "\
