@@ -32,6 +32,8 @@ IMPORTANT:  Always use exactly this syntax for math:
 - inline: \$formula\$
 - display: $$formula$$
 Never use single $ for inline math!
+    WRONG: $x^2+y^2=1$
+    CORRECT: \$x^2+y^2=1\$
 Always follow these rules:
 1. Use inline mode when referring to mathematical symbols, variables, or simple expressions within text sentences
 2. Use display mode for standalone equations, complex formulas, or mathematical structures like matrices
