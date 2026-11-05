@@ -177,78 +177,83 @@ async def chat_with_claude_body(message, temperature, max_tokens, session, prefi
 
     for attempt in range(max_retries):
         should_retry = False
+        stopped_early = False
+        stop_reason = None
+
         try:
-            client = anthropic.Client(api_key = api_key)
-            stream = client.messages.create(
-                model=MODEL_ID,
-                system=system_param,
-                max_tokens=max_tokens,
-                # temperature=temperature,
-                messages=msg_ap,
-                stream=True
-            )
+            client = anthropic.Client(api_key=api_key)
 
             assistant_message = ""
             if prefill_text:
                 assistant_message += prefill_text
 
-            for chunk in stream:
-                if session["stop_generation"]:
-                    break
+            with client.messages.stream(
+                model=MODEL_ID,
+                system=system_param,
+                max_tokens=max_tokens,
+                # temperature=temperature,
+                messages=msg_ap,
+            ) as stream:
 
-                if getattr(chunk, 'type', None) == 'message_delta':
-                        sr = getattr(chunk.delta, 'stop_reason', None)
+                for event in stream:
+                    if session["stop_generation"]:
+                        stream.close()
+                        stopped_early = True
+                        break
+
+                    if event.type == "message_start":
+                        # --- DEBUG: cache stats (identyczne miejsce co wcześniej - message_start)
+                        if DEBUG and hasattr(event.message, 'usage'):
+                            u = event.message.usage
+                            cache_created = getattr(u, 'cache_creation_input_tokens', 0)
+                            cache_read = getattr(u, 'cache_read_input_tokens', 0)
+                            input_tokens = getattr(u, 'input_tokens', 0)
+                            logging.debug(f"📊 CACHE STATS | input: {input_tokens} | "
+                                  f"cache_created: {cache_created} | "
+                                  f"cache_read: {cache_read}")
+                        # ---
+
+                    elif event.type == "content_block_delta":
+                        if event.delta.type == "text_delta":
+                            assistant_message += event.delta.text
+
+                    elif event.type == "message_delta":
+                        sr = getattr(event.delta, 'stop_reason', None)
                         if sr:
                             stop_reason = sr
                             logging.debug(f"stop_reason received: {sr}")
                             print(f"stop_reason received: {sr}")
 
-                if hasattr(chunk, 'error') and chunk.error.get('type') == 'overloaded_error':
-                    if attempt < max_retries - 1:
-                        wait_time = retry_delay * (2 ** attempt)
-                        print(f"Overloaded error, waiting {wait_time} seconds before retry...")
-                        logging.error(f"Overloaded error, waiting {wait_time} seconds before retry...")
-                        await asyncio.sleep(wait_time)
-                        should_retry = True
-                        break
-                    else:
-                        error_message = "Server is currently overloaded. Please try again later."
-                        session["assistant_messages"].append(error_message)
-                        yield format_history(session)
-                        return
+                    await asyncio.sleep(0)
+                    yield format_history(session, assistant_message)
 
-                if hasattr(chunk, 'delta'):
-                    if hasattr(chunk.delta, 'text'):
-                        assistant_message += chunk.delta.text
-                    elif hasattr(chunk.delta, 'content') and chunk.delta.content:
-                        for content in chunk.delta.content:
-                            if content.type == 'text':
-                                assistant_message += content.text
-
-                elif hasattr(chunk, 'message'):
-                    # --- DEBUG: cache stats
-                    if DEBUG and hasattr(chunk.message, 'usage'):
-                        u = chunk.message.usage
-                        cache_created = getattr(u, 'cache_creation_input_tokens', 0)
-                        cache_read = getattr(u, 'cache_read_input_tokens', 0)
-                        input_tokens = getattr(u, 'input_tokens', 0)
-                        logging.debug(f"📊 CACHE STATS | input: {input_tokens} | "
-                              f"cache_created: {cache_created} | "
-                              f"cache_read: {cache_read}")
-                    # ---
-
-                    if hasattr(chunk.message, 'content'):
-                        for content in chunk.message.content:
-                            if content.type == 'text':
-                                assistant_message += content.text
-
-                await asyncio.sleep(0)
-                yield format_history(session, assistant_message)
+                # stream.get_final_message() tylko gdy normalnie dobiegł końca
+                # (nie przerwany ręcznie) — zachowane głównie dla spójności obiektu,
+                # nie jest tu niezbędne poza ew. dalszym debugowaniem.
 
             if should_retry:
                 continue
 
+            if stopped_early:
+                # zachowanie identyczne jak w oryginale: pętla po prostu kończy
+                # się bez dodatkowego break/continue -> przechodzi dalej do
+                # warunków poniżej, tak jak wcześniej przy session["stop_generation"]
+                pass
+
             if assistant_message:
+                if stop_reason == "max_tokens":
+                    assistant_message += "\n\n⚠️ *Odpowiedź została ucięta (osiągnięto limit max_tokens).*"
+                session["assistant_messages"].append(assistant_message)
+                yield format_history(session)
+                break
+
+            if assistant_message:
+                if stop_reason == "max_tokens":
+                    assistant_message += "\n\n⚠️ *Odpowiedź została ucięta (osiągnięto limit max_tokens).*"
+                elif stopped_early:
+                    assistant_message += "\n\n⚠️ *Generowanie zostało przerwane przez użytkownika.*"
+                elif stop_reason == "refusal":
+                    assistant_message += "\n\n⚠️ *Model odmówił dokończenia odpowiedzi ze względów bezpieczeństwa.*"
                 session["assistant_messages"].append(assistant_message)
                 yield format_history(session)
                 break
@@ -256,9 +261,30 @@ async def chat_with_claude_body(message, temperature, max_tokens, session, prefi
             if not assistant_message:
                 logging.warning(f"Empty assistant_message! stop_reason={stop_reason}")
                 print(f"Empty assistant_message! stop_reason={stop_reason}")
-                fallback = f"⚠️ Model zwrócił pustą odpowiedź (stop_reason: {stop_reason})."
+                if stop_reason == "refusal":
+                    fallback = f"⚠️ *Model zwrócił pustą odpowiedź ze względów bezpieczeństwa (stop_reason: {stop_reason}).*"
+                else:
+                    fallback = f"⚠️ Model zwrócił pustą odpowiedź (stop_reason: {stop_reason})."
                 session["assistant_messages"].append(fallback)
                 yield format_history(session)
+                break
+
+        except anthropic.APIStatusError as e:
+            is_overloaded = getattr(e, "status_code", None) == 529
+            if attempt < max_retries - 1:
+                wait_time = retry_delay * (2 ** attempt)
+                reason = "Overloaded error" if is_overloaded else f"API error: {e}"
+                print(f"{reason}, waiting {wait_time} seconds before retry...")
+                logging.error(f"{reason}, waiting {wait_time} seconds before retry...")
+                await asyncio.sleep(wait_time)
+                continue
+            else:
+                error_message = ("Server is currently overloaded. Please try again later."
+                                  if is_overloaded else f"An error occurred: {e}")
+                session["assistant_messages"].append(error_message)
+                yield format_history(session)
+                if is_overloaded:
+                    return
                 break
 
         except Exception as e:
@@ -296,6 +322,7 @@ def format_history(session, current_message=None):
         history.append({"role": "assistant", "content": current_message})
 
     return history
+
 
 def format_history_with_rendering(session):
     """Format history i renderuj wykresy (ta sama logika co w respond)"""
