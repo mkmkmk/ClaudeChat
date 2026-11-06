@@ -15,6 +15,7 @@ import base64
 import sys
 import logging
 import warnings
+import re
 from pathlib import Path
 
 # pip install gradio==5.49.1
@@ -225,7 +226,7 @@ async def chat_with_claude_body(message, temperature, max_tokens, session, prefi
                             print(f"stop_reason received: {sr}")
 
                     await asyncio.sleep(0)
-                    yield format_history(session, assistant_message)
+                    yield format_history(session, hide_latex(assistant_message))
 
                 # stream.get_final_message() tylko gdy normalnie dobiegł końca
                 # (nie przerwany ręcznie) — zachowane głównie dla spójności obiektu,
@@ -306,6 +307,36 @@ def stop_generation_func(session):
     if DEBUG:
         logging.debug(f"Stop generation called for session: {session['id']}")
     session["stop_generation"] = True
+
+
+SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+def hide_latex(text):
+    pattern = re.compile(
+        r'[$]{2}.*?[$]{2}|\\[$].*?\\[$]|\\\(.*?\\\)|\\\[.*?\\\]',
+        re.DOTALL
+    )
+
+    def replacer(m):
+        # formuła już domknięta -> stabilny symbol końcowy
+        return "`[ ]`"
+
+    text = pattern.sub(replacer, text)
+
+    tail_pattern = re.compile(
+        r'([$]{2}|\\[$]|\\\(|\\\[)(?!.*(?:[$]{2}|\\[$]|\\\)|\\\]))',
+        re.DOTALL
+    )
+
+    tail_match = tail_pattern.search(text)
+
+    if tail_match:
+        start = tail_match.start()
+        length = len(text) - start
+        ch = SPINNER[(length // 2) % len(SPINNER)]
+        text = text[:start] + "`[" + ch + "]`"
+
+    return text
 
 
 def format_history(session, current_message=None):
